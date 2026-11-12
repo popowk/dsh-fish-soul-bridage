@@ -1,79 +1,42 @@
-# dsh-fish-soul-bridage v1.1.0
+# dsh-fish-soul-bridage v1.1.1
 
-Windows 统一启动包，整合 DSH fish-soul 客户网关（56781）、SnowLuma WebUI/VMO 上报与 Ayu BreezeBlue TTS 桥（8765）。项目名 `bridage` 沿用仓库拼写。
+Windows x64 整合项目：**DSH fish-soul 客户网关 + SnowLuma 2.4.2 + Ayu BreezeBlue TTS**。项目名 `bridage` 保留现有 GitHub 仓库拼写。
 
-## 运行方式
-
-1. 解压到任意 Windows 目录（推荐 `C:\dsh\dsh-fish-soul-bridage`，**不要求固定路径**）。
-2. 安装并首次启动 DSH Desktop，确保能访问已安装 fish-soul 插件；需要 PowerShell 5.1+、交互式桌面和可用的 Node 22.5+。
-3. `Start.cmd` 是**唯一**启动入口，内部启动 Ayu → 检查 DSH 插件 → 启动 SnowLuma 监督器 → 启动 56781 网关。
-4. 检查 `http://127.0.0.1:8765/health` 与 `http://127.0.0.1:56781/__bridge/health`，VMO 本机登记使用 127.0.0.1:18767 / Report-App-JSON.py 回退。
-5. Ayu 在 fish-soul 设置 TTS Base URL 为 `http://127.0.0.1:8765/v1`，TTS 密钥填写个人的真实 BreezeBlue API Key，**不要提交到仓库**。
-
-## 目录
+## 完整目录
 
 ```text
-Start.cmd                       唯一启动文件
-VERSION                         1.1.0 机器可读版本
-scripts/Start-All.ps1           统一路径、进程和端口管理
-components/gateway/             V6.9.29 原功能重构，客户操作、56781、VMO 上报
-components/ayu/                 v1.4 Ayu TTS 桥；不保存 API 密钥
-components/snowluma/            v2.4.2 用户提供的修复 Overlay（非完整原版 WebUI）
-tests/                          集成结构和配置回归测试
+dsh-fish-soul-bridage/
+├── Start.cmd                         唯一启动入口
+├── VERSION                           整合项目版本
+├── scripts/
+│   ├── Start-All.ps1                 全路径相对定位及启动控制
+│   └── Patch-SnowLuma-VMO.mjs        静态资源 SHA-256 校验及幂等修复
+└── components/
+    ├── gateway/                      fish-soul 客户网关、DSH 连接及 VMO 上报
+    ├── ayu/                          Ayu TTS bridge
+    └── snowluma/                     完整 SnowLuma v2.4.2 Windows 运行文件
+        ├── node.exe
+        ├── index.mjs
+        ├── release.json
+        ├── native/
+        └── client/                   完整 CSS、JS、Logo 和 VMO BasePath 资源
 ```
 
-## 关键兼容与限制
+**GitHub 仓库的 `components/snowluma/` 是完整运行目录**，并非过去只有部分 HTML/JS 的 Overlay；打包发布时直接使用 Git 中的文件，不再从第三方下载地址动态拼装。
 
-- 启动器会优先从 `C:\dsh\SnowLuma*` 中**同版本 2.4.2 的完整安装**复制缺失的公共 `client/` 静态资源到集成目录（不会覆盖修复后的 JS，也不会读取凭据和用户数据）。`SNOWLUMA_COMPLETE_SOURCE` 可显式指定补全来源，`SNOWLUMA_DIR` 则可直接指定完整安装目录并跳过复制。项目内用户提供的 `SnowLuma_v2.4.2_Fix.zip` 只有少量 JS/HTML 并缺少完整 CSS 资源，**不能冒充完整安装版**。启动器会验证存在 CSS，否则跳过 SnowLuma，防止从 VMO 打开后白屏。若需要应用补丁，应先备份完整原安装并按同版本覆盖 Overlay。
-- SnowLuma 密码只在监督器直接启动并收到密码日志时捕获。观察已有进程不能恢复先前密码；56781 独立登录码仍单独上报，不等于 DSH Token。
-- 防火墙检查通过后 SnowLuma 可监听 0.0.0.0，但仅允许受信源 `192.168.2.99`，公网走 VMO WSS；不要将 5099 直接开放公网。
-- 8765、56781 与 18767 是不同端口；8765 仅监听回环，56781 使用自身登录码。
-- 运行日志在 `%LOCALAPPDATA%\dsh-fish-soul-bridage\logs` 及兼容性网关日志目录。不会记录明文授权。
-- SnowLuma 运行时包含第三方二进制与独立许可；本仓库不应未经许可公开分发这部分二进制。应通过授权的完整原版安装包配置 `SNOWLUMA_DIR`。
-- 删除多个旧 `Start.bat`、`launcher.bat`、版本历史 README 和过时诊断脚本；保留正在被调用的网关模块与测试。
+## 运行
 
-## 测试
+1. 先在 Windows 安装并初始化 **DSH Desktop**。本项目**不包含 DSH Desktop 安装程序**。
+2. 在 DSH Desktop 中安装/启用 `dsh-fish-soul`；本项目**不包含 fish-soul 的 .tgz 离线安装包**。如果插件缺失，网关现有的 DSH CLI 安装流程可尝试从配置的软件源获取，需相应网络。
+3. 下载 GitHub Release 的 **`Windows-Full.zip`**，解压到任意目录，运行根目录 `Start.cmd`。不要误用 GitHub 自动生成的源码压缩包。
+4. SnowLuma 和 Ayu 使用项目附带的 `components/snowluma/node.exe`，不要求系统安装 Node；VMO Python 登记助手仍使用系统已安装的 Python。
 
-`npm test` 或在系统 Node 22.5+ 下分别运行网关测试、Ayu smoke 测试。真实 DSH Desktop、VMO 转发与 Windows 防火墙必须在 Windows 实机验证。
+应用端口：SnowLuma WebUI **5099**；fish-soul 客户网关 **56781**；Ayu TTS **8765**（仅本机）；已有 VMO Guest Agent **18767** 用于接收注册。VMO 管理页面 `https://host.tmd.pet/client` 通过已有隧道转发。
 
-## 故障诊断
+SnowLuma 的 VMO 反代版包括动态 CSS、Logo、背景预览及调试上传路径修复。启动前校验已知的文件 SHA-256，不识别的 SnowLuma 构建不会被静默覆盖；需要更新到新版 SnowLuma 时应先重新适配并验证。
 
-- 56781 没监听：检查网关控制台与 `%LOCALAPPDATA%\DSH-FishSoul-Gateway\logs`。
-- 8765 端口冲突：退出旧版单独 Ayu 实例或设置 `BRIDGE_PORT`（并同步 TTS BaseURL），统一入口不会强杀不相关进程。
-- SnowLuma 网页缺 CSS：检查 `SNOWLUMA_DIR\client\assets\*.css`，不可只复制补丁并假装完整安装。
-- VMO 502/404：分别检查本机服务健康、18767 注册与 8766 WSS 代理，单独验证上游。
-## v1.0.1 — SnowLuma 2.4.2 反代修复
+## 发布方式
 
-使用完整的 SnowLuma 2.4.2 安装目录，且其前端已经包含 VMO BasePath Overlay (`client/assets/*.vmo.js`)。
-统一 `Start.cmd` 会先校验三个前端文件的 SHA-256，再修复 Logo、背景预览和调试文件上传的根路径问题。已修复文件会直接跳过；不认识的文件不会被强行覆盖。
-原文件会备份到 `client/.vmo-backups/v1.0.1/`。如已经有完整 SnowLuma，可通过 `SNOWLUMA_DIR` 指向该目录，无需把第三方二进制提交到 GitHub。
+修改代码后，Windows CI 检查 JavaScript 和 PowerShell 语法；更新 `VERSION` 和 `package.json` 后，GitHub Actions 从**仓库中已提交的 SnowLuma 文件**构建完整 ZIP，并验证启动入口、Node、CSS、Logo、网关、Ayu 都存在。Release 不包含 DSH Desktop 的安装程序，也不包含 fish-soul 插件安装包。
 
-手动只读预检：
-
-```powershell
-node scripts/Patch-SnowLuma-VMO.mjs "C:\dsh\SnowLuma" --check
-```
-
-停止 SnowLuma 后手动修复：
-
-```powershell
-node scripts/Patch-SnowLuma-VMO.mjs "C:\dsh\SnowLuma"
-```
-
-**发布说明：** 本仓库和 GitHub Release 只提供整合项目源码与可复现补丁器；SnowLuma v2.4.2 第三方运行文件不在公开仓库中。Windows/VMO 实机反向代理仍需单独验证。
-
-## v1.0.2 — 已验证启动脚本
-
-重新构建统一启动器，修正 v1.0.1 首次发布时的 PowerShell 文本替换错误。GitHub Actions Windows CI（Node 测试、补丁器语法、PowerShell 语法）通过后发布。SnowLuma 资源补丁仍保持 1.0.1 的 SHA-256 校验与备份路径。
-
-## v1.1.0 完整 Windows 发布包
-
-到 GitHub Releases 下载 `dsh-fish-soul-bridage-v1.1.0-Windows-Full.zip`，解压运行根目录唯一的 `Start.cmd`。`-source.zip` 为源码包，不含 Windows 二进制。
-
-Windows-Full ZIP 包含 SnowLuma v2.4.2 完整前端、Node.exe、原生模块、VMO BasePath/动态 CSS/Logo 修复；fish-soul 网关；Ayu TTS；DSH Desktop v0.2.2-rc.1 离线安装程序，以及 dsh-fish-soul 0.15.33 插件安装包。Python 继续使用系统已安装版本。
-
-`Start.cmd` 检查现有 DSH Desktop；缺失时校验随包安装程序的 SHA-256 并尝试安装，已有安装和用户配置不会覆盖。fish-soul 插件缺失时优先使用包内 tgz。DSH 首次运行仍需要用户完成登录/初始化，其递归依赖是否完全离线可用需 Windows 实机验证。
-
-完整 ZIP 由 GitHub Actions 合并固定版本 SnowLuma 完整包与 VMO Overlay，自动验证 CSS、Logo、Node、服务端和修复 JS 文件后发布；不需要 Windows 机器在启动时下载 SnowLuma、Node 或 Ayu。VMO 应用上报仍使用已安装的 Guest Agent 和系统 Python。
-
-软件端口：SnowLuma 5099、网关 56781、Ayu TTS 8765、VMO Guest Agent 18767。不要将 5099 或 56781 无保护暴露到公网。
+不收集或提交本机 DSH Token、SnowLuma 随机密码、fish-soul 独立登录码或浏览器登录数据。更新时不要覆盖用户配置目录。Windows 实机启动及 VMO 端到端反代仍需另行验证。
