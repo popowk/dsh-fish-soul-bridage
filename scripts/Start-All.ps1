@@ -114,7 +114,46 @@ if ($CheckOnly) {
 $env:FS_BUNDLE_NODE = $node
 # Caller overrides SNOWLUMA_DIR when an existing FULL installation is used.
 # Bundled fix overlay may lack full CSS assets; deploy.ps1 will not start a partial WebUI.
+# Prefer complete SnowLuma v2.4.2, including external installations.
+if (-not $env:SNOWLUMA_DIR) {
+  $sources = @($snow)
+  if ($env:SNOWLUMA_COMPLETE_SOURCE) { $sources += $env:SNOWLUMA_COMPLETE_SOURCE }
+  $sources += 'C:\dsh\SnowLuma'
+  if (Test-Path -LiteralPath 'C:\dsh' -PathType Container) {
+    $sources += @(Get-ChildItem -LiteralPath 'C:\dsh' -Directory -ErrorAction SilentlyContinue |
+      Where-Object { $_.Name -match '^SnowLuma(?:[-_].*)?
+if (-not $env:FS_CUSTOMER_MODELS_CONFIG) { $env:FS_CUSTOMER_MODELS_CONFIG = '1' }
+if (-not $env:FS_CUSTOMER_DOUYIN_CONFIG) { $env:FS_CUSTOMER_DOUYIN_CONFIG = '1' }
+if (-not $env:FS_CUSTOMER_SOCIAL_CONFIG) { $env:FS_CUSTOMER_SOCIAL_CONFIG = '1' }
+if (-not $env:FS_CUSTOMER_BILI_AUTH) { $env:FS_CUSTOMER_BILI_AUTH = '1' }
+if (-not $env:FS_CUSTOMER_DOUYIN_BROWSER) { $env:FS_CUSTOMER_DOUYIN_BROWSER = '1' }
+$env:FS_CUSTOMER_DOUYIN_CUSTOM_BROWSER = '0'
+Start-Ayu $node
+Write-Host '[Start] Starting DSH plugin installer, SnowLuma supervisor, and 56781 gateway.'
+& (Join-Path $gateway 'deploy.ps1')
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+ } | ForEach-Object { $_.FullName })
+  }
+  foreach ($candidate in @($sources | Select-Object -Unique)) {
+    if (!(Test-Path -LiteralPath (Join-Path $candidate 'index.mjs') -PathType Leaf) -or
+        !(Test-Path -LiteralPath (Join-Path $candidate 'client\assets\overview-page-Bm3ks5zC.css') -PathType Leaf)) { continue }
+    try {
+      $rel = Get-Content -LiteralPath (Join-Path $candidate 'release.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+      if ([string]$rel.version -eq '2.4.2') { $env:SNOWLUMA_DIR = $candidate; break }
+    } catch {}
+  }
+}
 if (-not $env:SNOWLUMA_DIR) { $env:SNOWLUMA_DIR = $snow }
+# Never rewrite an unknown build. All three assets must match known SHA-256.
+$patchEntry = Join-Path $env:SNOWLUMA_DIR 'client\assets\index-DolPqBYW.vmo.js'
+if (Test-Path -LiteralPath $patchEntry -PathType Leaf) {
+  & $node (Join-Path $project 'scripts\Patch-SnowLuma-VMO.mjs') $env:SNOWLUMA_DIR
+  if ($LASTEXITCODE -ne 0) {
+    throw 'SnowLuma VMO patch preflight failed. Inspect the installed version before starting.'
+  }
+} else {
+  Write-Warning 'Recognized SnowLuma VMO BasePath overlay not found; reverse proxy compatibility is unverified.'
+}
 if (-not $env:FS_CUSTOMER_MODELS_CONFIG) { $env:FS_CUSTOMER_MODELS_CONFIG = '1' }
 if (-not $env:FS_CUSTOMER_DOUYIN_CONFIG) { $env:FS_CUSTOMER_DOUYIN_CONFIG = '1' }
 if (-not $env:FS_CUSTOMER_SOCIAL_CONFIG) { $env:FS_CUSTOMER_SOCIAL_CONFIG = '1' }
