@@ -1,9 +1,8 @@
-name: Publish v1.0.0 source release
+name: Publish versioned source release
 on:
   push:
     branches: [main]
-    paths:
-      - '.github/workflows/release.yml'
+    paths: [VERSION]
   workflow_dispatch:
 permissions:
   contents: write
@@ -13,31 +12,44 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: release/v1.0.0
           fetch-depth: 0
-      - name: Package source (without third-party SnowLuma binaries)
+      - name: Package source (without third-party binaries)
+        id: build
         shell: bash
         run: |
-          python3 - <<'PY'
-          import pathlib,zipfile
-          root=pathlib.Path('.')
-          with zipfile.ZipFile('dsh-fish-soul-bridage-v1.0.0-source.zip','w',zipfile.ZIP_DEFLATED) as out:
-              for p in root.rglob('*'):
-                  if not p.is_file() or '.git' in p.parts or p.name.endswith('.zip'):
-                      continue
+          set -euo pipefail
+          VERSION="$(tr -d '\r\n' < VERSION)"
+          test "$VERSION" = "$(node -p "require('./package.json').version")"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          python3 - "$VERSION" <<'PY'
+          import pathlib,sys,zipfile
+          version=sys.argv[1]
+          with zipfile.ZipFile('dsh-fish-soul-bridage-v'+version+'-source.zip','w',zipfile.ZIP_DEFLATED) as out:
+              for p in pathlib.Path('.').rglob('*'):
+                  if (not p.is_file() or '.git' in p.parts or p.suffix.lower() in
+                      ('.zip','.exe','.dll','.node','.pdb','.pem','.key') or
+                      p.name in ('.env','.credentials.yaml')): continue
                   out.write(p,p.as_posix())
           PY
-      - name: Publish verified v1.0.0 source release
+      - name: Publish versioned source
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: bash
+          VERSION: ${{ steps.build.outputs.version }}
         run: |
-          TARGET="$(git rev-parse HEAD)"
-          git tag -f v1.0.0 "$TARGET"
-          git push origin +refs/tags/v1.0.0
-          if gh release view v1.0.0 >/dev/null 2>&1; then
-            gh release upload v1.0.0 dsh-fish-soul-bridage-v1.0.0-source.zip --clobber
-            gh release edit v1.0.0 --target "$TARGET" --notes 'Unified Gateway + Ayu TTS + SnowLuma launch integration. Source release only: SnowLuma binaries are not redistributed. For the full Windows bundle use the separately provided package. JavaScript and Windows PowerShell syntax CI passed; live Windows integration still requires validation.'
+          set -euo pipefail
+          TAG="v$VERSION"
+          FILE="dsh-fish-soul-bridage-$TAG-source.zip"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if ! git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            git tag "$TAG" "$GITHUB_SHA"
+            git push origin "refs/tags/$TAG"
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$FILE" --clobber
           else
-            gh release create v1.0.0 dsh-fish-soul-bridage-v1.0.0-source.zip --target "$TARGET" --title 'dsh-fish-soul-bridage v1.0.0' --notes 'Unified Gateway + Ayu TTS + SnowLuma integration. Source only; licensed SnowLuma installation required.'
+            gh release create "$TAG" "$FILE" --target "$GITHUB_SHA" \
+              --title "dsh-fish-soul-bridage $TAG" \
+              --notes 'Source-only release with SnowLuma v2.4.2 VMO asset hotfix. Third-party binaries are not redistributed. Real Windows/VMO validation is still required.'
           fi
