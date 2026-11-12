@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.1
+
+- Verify and patch three known SnowLuma 2.4.2 VMO frontend files (Logo, background preview, debug upload) by SHA-256 with backups and idempotence.
+- Prefer existing complete SnowLuma 2.4.2 installations; integrate patching into unified Start.cmd.
+- Update version checks and automated source release workflow; preserve v1.0.0 tag.
+- No third-party SnowLuma binaries or credentials published.
+
+
 ## 1.0.0
 
 - Rename unified project to `dsh-fish-soul-bridage` (repository spelling).
