@@ -1,4 +1,4 @@
-name: Publish complete Windows v1.x distribution
+name: Publish bundled Windows distribution from repository
 on:
   push:
     branches: [main]
@@ -8,8 +8,8 @@ permissions:
   contents: write
 jobs:
   release:
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
+    runs-on: windows-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
@@ -17,113 +17,90 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Check unified project
-        shell: bash
+      - name: Verify single-launcher bundle
+        shell: pwsh
         run: |
-          set -euo pipefail
-          VERSION="$(tr -d '\r\n' < VERSION)"
-          test "$VERSION" = "$(node -p "require('./package.json').version")"
-          node --check scripts/Patch-SnowLuma-VMO.mjs
-          python3 -m py_compile scripts/Assemble-Windows.py
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content VERSION -Raw).Trim()
+          if ($version -ne (node -p "require('./package.json').version")) { throw 'VERSION mismatch' }
           npm test
-      - name: Download exact SnowLuma complete base and BasePath overlay
-        shell: bash
+          node --check scripts/Patch-SnowLuma-VMO.mjs
+          $files = @('scripts/Start-All.ps1','components/gateway/deploy.ps1')
+          foreach ($file in $files) {
+            $tokens = $null; $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file),[ref]$tokens,[ref]$errors)
+            if ($errors.Count -gt 0) { throw ($errors | Out-String) }
+          }
+          $snow = Join-Path $PWD 'components/snowluma'
+          $necessary = @(
+            'node.exe','index.mjs','release.json','client/index.html',
+            'client/logo.png','client/assets/overview-page-Bm3ks5zC.css',
+            'client/assets/router-_TYMdJui.vmo.js','native/snowluma-win32-x64.node'
+          )
+          foreach ($file in $necessary) {
+            if (!(Test-Path (Join-Path $snow $file) -PathType Leaf)) { throw ('Missing SnowLuma runtime: ' + $file) }
+          }
+          & (Join-Path $snow 'node.exe') scripts/Patch-SnowLuma-VMO.mjs $snow --check
+          if ($LASTEXITCODE -ne 0) { throw 'SnowLuma patch checksum preflight failed' }
+          foreach ($file in @('client/assets/index-DolPqBYW.vmo.js','client/assets/router-_TYMdJui.vmo.js','client/assets/settings-page-C7mrOgzU.vmo.js')) {
+            & (Join-Path $snow 'node.exe') --check (Join-Path $snow $file)
+            if ($LASTEXITCODE -ne 0) { throw ('Invalid SnowLuma JS: '+$file) }
+          }
+          if (Test-Path 'components/dsh-desktop') { throw 'DSH Desktop installer must not be bundled' }
+          if (Test-Path 'components/dsh-plugin') { throw 'fish-soul plugin installer must not be bundled' }
+      - name: Create full Windows ZIP directly from tracked repo files
+        id: bundle
+        shell: pwsh
         run: |
-          set -euo pipefail
-          curl --fail --location --retry 8 --retry-all-errors --retry-delay 4 --max-time 220 \
-            --output /tmp/snow-complete.zip 'https://pan.tmd.pet/down.php?hash=7fddc8958202eecea079bcb2ed8152a7'
-          curl --fail --location --retry 8 --retry-all-errors --retry-delay 4 --max-time 220 \
-            --output /tmp/snow-overlay.zip 'https://haha.tmd.pet/SnowLuma-v2.4.2-win-x64-BasePath-Overlay.zip'
-          echo '6e330436feb7c976dc9fc6d7af057ae5230294da8ec77a19c3991b6c32b41434  /tmp/snow-overlay.zip' | sha256sum -c -
-          echo '0912926c5e73260f35b000278a8658493fc9452f36782c32fa86f0e825bad81a  /tmp/snow-complete.zip' | sha256sum -c -
-          python3 - <<'PY'
-          import zipfile
-          for p in ['/tmp/snow-complete.zip','/tmp/snow-overlay.zip']:
-              with zipfile.ZipFile(p) as z:
-                  assert z.testzip() is None
-                  assert len(z.namelist())>=20
-          PY
-      - name: Assemble full bundled SnowLuma runtime
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 scripts/Assemble-Windows.py /tmp/snow-complete.zip /tmp/snow-overlay.zip
-          test -f dist/dsh-fish-soul-bridage/components/snowluma/node.exe
-          test -f dist/dsh-fish-soul-bridage/components/snowluma/client/assets/overview-page-Bm3ks5zC.css
-      - name: Download pinned DSH Desktop offline installer
-        shell: bash
-        run: |
-          set -euo pipefail
-          TARGET='dist/dsh-fish-soul-bridage/components/dsh-desktop'
-          mkdir -p "$TARGET"
-          curl --fail --location --retry 8 --retry-all-errors --retry-delay 5 --max-time 360 \
-            --output "$TARGET/deepseek-harness-0.2.2-rc.1-win-x64.exe" \
-            'https://github.com/Britripe/deepseek-harness-desktop/releases/download/v0.2.2-rc.1/deepseek-harness-0.2.2-rc.1-win-x64.exe'
-          echo "830947f8996dc05d991ca9133fff4d3400073e47b9cfa6507754867e79482b23  $TARGET/deepseek-harness-0.2.2-rc.1-win-x64.exe" | sha256sum -c -
-      - name: Bundle offline dsh-fish-soul plugin
-        shell: bash
-        run: |
-          set -euo pipefail
-          TARGET='dist/dsh-fish-soul-bridage/components/dsh-plugin'
-          mkdir -p "$TARGET"
-          npm pack dsh-fish-soul@0.15.33 --pack-destination "$TARGET" --silent
-          test -s "$TARGET/dsh-fish-soul-0.15.33.tgz"
-      - name: Build and validate distribution archives
-        id: bundles
-        shell: bash
-        run: |
-          set -euo pipefail
-          VERSION="$(tr -d '\r\n' < VERSION)"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          python3 - "$VERSION" <<'PY'
-          import sys,zipfile,os,pathlib
-          version=sys.argv[1]
-          root=pathlib.Path('dist')
-          final=root/'dsh-fish-soul-bridage'
-          with zipfile.ZipFile(f'dsh-fish-soul-bridage-v{version}-Windows-Full.zip','w',compression=zipfile.ZIP_DEFLATED,compresslevel=6,allowZip64=True) as z:
-              for p in final.rglob('*'):
-                  if p.is_file() and p.name not in ('.credentials.yaml',):
-                      z.write(p,p.relative_to(root).as_posix())
-          with zipfile.ZipFile(f'dsh-fish-soul-bridage-v{version}-source.zip','w',compression=zipfile.ZIP_DEFLATED) as z:
-              for p in pathlib.Path('.').rglob('*'):
-                  if not p.is_file() or '.git' in p.parts or 'dist' in p.parts or p.name.endswith('.zip'):
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content VERSION -Raw).Trim()
+          "version=$version" | Out-File -Append -Encoding utf8 $env:GITHUB_OUTPUT
+          @'
+          from pathlib import Path
+          import subprocess,zipfile,hashlib
+          version=Path('VERSION').read_text(encoding='utf-8-sig').strip()
+          dest=Path(f'dsh-fish-soul-bridage-v{version}-Windows-Full.zip')
+          files=[p.decode('utf-8') for p in subprocess.check_output(['git','ls-files','-z']).split(b'\0') if p]
+          with zipfile.ZipFile(dest,'w',zipfile.ZIP_DEFLATED,compresslevel=7,allowZip64=True) as out:
+              for name in files:
+                  if name.startswith('.github/') or name.startswith('tests/') or name=='.gitignore':
                       continue
-                  z.write(p,p.as_posix())
-          name=f'dsh-fish-soul-bridage-v{version}-Windows-Full.zip'
-          with zipfile.ZipFile(name) as z:
-              required=('dsh-fish-soul-bridage/Start.cmd',
-                        'dsh-fish-soul-bridage/components/snowluma/node.exe',
-                        'dsh-fish-soul-bridage/components/snowluma/client/logo.png',
-                        'dsh-fish-soul-bridage/components/snowluma/client/assets/overview-page-Bm3ks5zC.css',
-                        'dsh-fish-soul-bridage/components/ayu/bridge.mjs',
-                        'dsh-fish-soul-bridage/components/gateway/server.mjs',
-                        'dsh-fish-soul-bridage/components/dsh-desktop/deepseek-harness-0.2.2-rc.1-win-x64.exe',
-                        'dsh-fish-soul-bridage/components/dsh-plugin/dsh-fish-soul-0.15.33.tgz')
+                  file=Path(name)
+                  if not file.is_file():
+                      raise RuntimeError('Tracked file missing: '+name)
+                  if any(t in name.lower() for t in ('dsh-desktop/','dsh-plugin/','.credentials.yaml')):
+                      raise RuntimeError('Forbidden bundled installer/secret: '+name)
+                  out.write(file,'dsh-fish-soul-bridage/'+name)
+          with zipfile.ZipFile(dest) as z:
+              required=[
+                'dsh-fish-soul-bridage/Start.cmd',
+                'dsh-fish-soul-bridage/VERSION',
+                'dsh-fish-soul-bridage/components/snowluma/node.exe',
+                'dsh-fish-soul-bridage/components/snowluma/index.mjs',
+                'dsh-fish-soul-bridage/components/snowluma/client/logo.png',
+                'dsh-fish-soul-bridage/components/snowluma/client/assets/overview-page-Bm3ks5zC.css',
+                'dsh-fish-soul-bridage/components/ayu/bridge.mjs',
+                'dsh-fish-soul-bridage/components/gateway/server.mjs'
+              ]
               for p in required: assert p in z.namelist(),p
-              assert z.testzip() is None
-          print('FULL_WINDOWS_ZIP_BYTES',os.path.getsize(name))
-          PY
-          sha256sum "dsh-fish-soul-bridage-v$VERSION-Windows-Full.zip"
-      - name: Publish both full Windows and source assets
-        shell: bash
+              assert z.testzip() is None,'Corrupt ZIP'
+          print('WINDOWS_FULL_ZIP',dest,'SIZE',dest.stat().st_size,
+                'SHA256',hashlib.sha256(dest.read_bytes()).hexdigest())
+          '@ | python -
+          if ($LASTEXITCODE -ne 0) { throw 'Windows bundle creation failed' }
+      - name: Publish Windows-Full ZIP
+        shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.bundles.outputs.version }}
+          VERSION: ${{ steps.bundle.outputs.version }}
         run: |
-          set -euo pipefail
-          TAG="v$VERSION"
-          WIN="dsh-fish-soul-bridage-$TAG-Windows-Full.zip"
-          SOURCE="dsh-fish-soul-bridage-$TAG-source.zip"
+          $ErrorActionPreference = 'Stop'
+          $tag = 'v' + $env:VERSION
+          $file = 'dsh-fish-soul-bridage-' + $tag + '-Windows-Full.zip'
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          if ! git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
-            git tag "$TAG" "$GITHUB_SHA"
-            git push origin "refs/tags/$TAG"
-          fi
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$WIN" "$SOURCE" --clobber
-          else
-            gh release create "$TAG" "$WIN" "$SOURCE" --target "$GITHUB_SHA" \
-              --title "dsh-fish-soul-bridage $TAG (Windows Full)" \
-              --notes 'Windows all-in-one archive with SnowLuma v2.4.2 complete WebUI, bundled Node, Ayu TTS bridge, fish-soul gateway, DSH Desktop v0.2.2-rc.1 installer and fish-soul 0.15.33 package. Python uses the installed system interpreter. Run Start.cmd after extracting. Real Windows desktop and VMO host integration still require validation.'
-          fi
+          git tag $tag $env:GITHUB_SHA
+          git push origin "refs/tags/$tag"
+          if ($LASTEXITCODE -ne 0) { throw 'GitHub tag publication failed' }
+          gh release create $tag $file --target $env:GITHUB_SHA --title "dsh-fish-soul-bridage $tag (Windows Full)" --notes 'Complete SnowLuma v2.4.2 and Node runtime, gateway and Ayu bridge tracked in GitHub repository. No DSH Desktop installer, no fish-soul plugin package. DSH Desktop and fish-soul plugin must already be installed or configured separately; system Python is used for VMO helper.'
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }
