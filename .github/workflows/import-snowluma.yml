@@ -1,0 +1,57 @@
+name: Import complete patched SnowLuma v2.4.2 into repository
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/import-snowluma.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Download fixed-version SnowLuma base and overlay
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fSL --retry 6 --retry-all-errors --retry-delay 4 --max-time 240 \
+            -o /tmp/snowluma-base.zip 'https://pan.tmd.pet/down.php?hash=7fddc8958202eecea079bcb2ed8152a7'
+          curl -fSL --retry 6 --retry-all-errors --retry-delay 4 --max-time 240 \
+            -o /tmp/snowluma-overlay.zip 'https://haha.tmd.pet/SnowLuma-v2.4.2-win-x64-BasePath-Overlay.zip'
+          echo '0912926c5e73260f35b000278a8658493fc9452f36782c32fa86f0e825bad81a  /tmp/snowluma-base.zip' | sha256sum -c -
+          echo '6e330436feb7c976dc9fc6d7af057ae5230294da8ec77a19c3991b6c32b41434  /tmp/snowluma-overlay.zip' | sha256sum -c -
+      - name: Assemble and verify corrected SnowLuma files
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/Assemble-Windows.py /tmp/snowluma-base.zip /tmp/snowluma-overlay.zip
+          source='dist/dsh-fish-soul-bridage/components/snowluma'
+          test -f "$source/node.exe"
+          test -f "$source/client/assets/overview-page-Bm3ks5zC.css"
+          test -f "$source/client/logo.png"
+          test -f "$source/native/snowluma-win32-x64.node"
+          test "$(stat -c %s "$source/node.exe")" -gt 90000000
+          test "$(find "$source" -type f | wc -l)" -gt 60
+          mkdir -p components/snowluma
+          rm -f components/snowluma/README-OVERLAY.txt
+          cp -a "$source/." components/snowluma/
+          node scripts/Patch-SnowLuma-VMO.mjs components/snowluma --check
+          echo 'SNOWLUMA_FILES' "$(find components/snowluma -type f | wc -l)"
+      - name: Commit full SnowLuma runtime to components/snowluma
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add --all components/snowluma
+          git diff --cached --quiet && { echo 'SnowLuma files already tracked'; exit 0; }
+          git commit -m 'vendor: include complete SnowLuma 2.4.2 VMO-patched runtime'
+          git push origin HEAD:main
+          echo 'SNOWLUMA_REPO_IMPORT=success'
