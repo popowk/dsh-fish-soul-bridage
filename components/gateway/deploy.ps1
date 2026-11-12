@@ -503,14 +503,7 @@ function Ensure-Plugins {
   if (!$fishReady) {
     # Installation is allowed only when the plugin is missing/broken.
     # Never reinstall or upgrade a working existing fish-soul plugin.
-    $offlineFish = Join-Path (Split-Path -Parent $root) 'dsh-plugin\dsh-fish-soul-0.15.33.tgz'
-    if (Test-Path -LiteralPath $offlineFish -PathType Leaf) {
-      Info 'Installing bundled fish-soul 0.15.33 tarball (no npm package download needed).'
-      Invoke-DSH $dsh @('plugin','--profile','desktop','add',$offlineFish)
-    } else {
-      Warn 'Offline fish-soul package missing; falling back to existing configured registry.'
-      Invoke-DSH $dsh @('plugin','--profile','desktop','add','dsh-fish-soul')
-    }
+    Invoke-DSH $dsh @('plugin','--profile','desktop','add','dsh-fish-soul')
     $afterVersion=Find-InstalledFishVersion
     if (!$afterVersion -or !(Test-Path -LiteralPath $fishPkg)) {
       throw 'fish-soul missing-plugin installation verification failed.'
