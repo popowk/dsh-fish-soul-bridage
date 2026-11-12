@@ -10,6 +10,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Verify SnowLuma patch script syntax
+        run: node --check scripts/Patch-SnowLuma-VMO.mjs
       - name: JavaScript tests
         run: npm test
       - name: Validate PowerShell syntax
