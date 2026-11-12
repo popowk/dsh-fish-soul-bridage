@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.2
+
+- Reconstruct and validate the unified Start-All.ps1 launcher after fixing a text substitution corruption in the initial v1.0.1 release.
+- Windows Actions CI now reports PowerShell parse error locations and passes on the corrected script.
+- Keep the SnowLuma 2.4.2 SHA-256-verified asset patch unchanged.
+
+
 ## 1.0.1
 
 - Verify and patch three known SnowLuma 2.4.2 VMO frontend files (Logo, background preview, debug upload) by SHA-256 with backups and idempotence.
