@@ -1,0 +1,9 @@
+{
+  "name": "dsh-fish-soul-bridage",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Unified Windows launcher for DSH fish-soul gateway, SnowLuma and Ayu BreezeBridge",
+  "scripts": {
+    "test": "node --test components/gateway/tests/*.test.mjs && node components/ayu/tests/smoke.mjs && node --test tests/*.test.mjs"
+  }
+}

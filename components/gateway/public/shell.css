@@ -1,0 +1,8 @@
+:root {font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft Yahei",sans-serif;color:#1a1f2b;background:#f5f6f8}
+* {box-sizing:border-box}body{margin:0;min-height:100vh}.fs-host-head{height:54px;display:flex;align-items:center;gap:12px;padding:0 28px;background:#fff;border-bottom:1px solid #e8eaf0;position:sticky;top:0;z-index:40}
+.fs-host-head .mark{font-size:22px;color:#12141b;font-weight:800}.fs-host-head .subtitle{color:#7a8393;font-size:12px}.fs-host-head .version{margin-left:auto;color:#8c94a2;font-size:12px}.fs-host-head a{color:#53667d;text-decoration:none;font-size:12px}#root{min-height:calc(100vh - 54px)}
+.loading{padding:90px 24px;text-align:center;color:#677587}.spinner{display:inline-block;width:12px;height:12px;margin-right:10px;border:2px solid #a9b9cc;border-top-color:#2463ba;border-radius:50%;animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+.notice{position:fixed;right:16px;bottom:16px;max-width:400px;border-radius:10px;border:1px solid #cdd9e9;padding:12px 16px;color:#243951;background:#fff;box-shadow:0 10px 35px #2e466c20;z-index:200}
+.native-error{max-width:750px;margin:55px auto;padding:26px 30px;border:1px solid #e4e8ef;border-radius:14px;background:#fff;line-height:1.9}.native-error h2{margin:0 0 10px}.native-error a{color:#205ea8}
+
+.fs-permission-btn{border:1px solid #c4cedb;background:#fff;padding:5px 10px;border-radius:7px;color:#42516a;cursor:pointer;font:inherit;font-size:12px}.fs-permission-btn[data-enabled="true"]{color:#136e51;border-color:#7fc8ac;background:#edf9f4}.fs-permission-btn:disabled{opacity:.6;cursor:default}

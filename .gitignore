@@ -1,0 +1,17 @@
+# secrets and runtime data
+.env
+.env.*
+!.env.example
+*.log
+*.pid
+*.key
+*credentials*
+*token*.json
+host-auth.json
+node_modules/
+components/gateway/vendor/
+components/snowluma/
+**/*.bak
+**/*.backup
+*.zip
+*.7z

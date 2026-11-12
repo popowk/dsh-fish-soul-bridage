@@ -1,0 +1,5 @@
+const panel=document.getElementById('report');async function update(){try{const r=await fetch(new URL('__bridge/report',document.baseURI),{cache:'no-store'});panel.textContent=JSON.stringify(await r.json(),null,2)}catch(e){panel.textContent=String(e)}}document.getElementById('refresh').onclick=update;document.getElementById('copy').onclick=()=>navigator.clipboard.writeText(panel.textContent);update();
+
+document.getElementById('voice').onclick=async()=>{const out=document.getElementById('voice-report');out.hidden=false;out.textContent='检查中…';try{const r=await fetch(new URL('__bridge/voice-health',document.baseURI),{cache:'no-store'});out.textContent=JSON.stringify(await r.json(),null,2);}catch(e){out.textContent=String(e)}};
+
+document.getElementById('runtime').onclick=async()=>{const out=document.getElementById('runtime-report');out.hidden=false;out.textContent='正在读取两侧插件版本和语音状态…';try{const r=await fetch(new URL('__bridge/runtime-check',document.baseURI),{cache:'no-store'});out.textContent=JSON.stringify(await r.json(),null,2)}catch(e){out.textContent=String(e)}};

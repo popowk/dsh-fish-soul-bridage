@@ -1,0 +1,12 @@
+{
+  "voice": {
+    "enabled": true,
+    "ttsBaseURL": "http://127.0.0.1:8765/v1",
+    "ttsApiKey": "brz_在这里填写你的真实BreezeBlue_API_Key",
+    "ttsModel": "breeze-tts-2",
+    "ttsVoice": "voc_rm489h83rcvs",
+    "speak": "mirror",
+    "maxChars": 60,
+    "ttsPerDay": 10
+  }
+}
