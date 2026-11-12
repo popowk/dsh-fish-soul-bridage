@@ -21,5 +21,8 @@ jobs:
           foreach ($file in $files) {
             $tokens = $null; $errors = $null
             [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$tokens, [ref]$errors)
-            if ($errors.Count) { throw ($errors | Out-String) }
+            if ($errors.Count) {
+              foreach ($e in $errors) { Write-Host ($file + ':' + $e.Extent.StartLineNumber + ':' + $e.Extent.StartColumnNumber + ' ' + $e.Message) }
+              throw ('PowerShell syntax errors: ' + $file)
+            }
           }
