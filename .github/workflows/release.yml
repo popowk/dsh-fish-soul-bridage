@@ -1,0 +1,38 @@
+name: Publish v1.0.0 source release
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/release.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/v1.0.0
+      - name: Package source (without third-party SnowLuma binaries)
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import pathlib,zipfile
+          root=pathlib.Path('.')
+          with zipfile.ZipFile('dsh-fish-soul-bridage-v1.0.0-source.zip','w',zipfile.ZIP_DEFLATED) as out:
+              for p in root.rglob('*'):
+                  if not p.is_file() or '.git' in p.parts or p.name.endswith('.zip'):
+                      continue
+                  out.write(p,p.as_posix())
+          PY
+      - name: Publish immutable source release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if gh release view v1.0.0 >/dev/null 2>&1; then
+            echo 'v1.0.0 already exists; no overwrite'
+            exit 0
+          fi
+          gh release create v1.0.0 dsh-fish-soul-bridage-v1.0.0-source.zip --target 84e979b174ef97bf867c247a1f0af65b21ee4b3e --title 'dsh-fish-soul-bridage v1.0.0' --notes 'Unified Gateway + Ayu TTS + SnowLuma launch integration. Source release only. SnowLuma third-party binary overlay is intentionally excluded; use a separately authorized complete SnowLuma installation. Windows integration testing is still required.'
