@@ -1,4 +1,4 @@
-# dsh-fish-soul-bridage v1.0.1
+# dsh-fish-soul-bridage v1.0.2
 
 Windows 统一启动包，整合 DSH fish-soul 客户网关（56781）、SnowLuma WebUI/VMO 上报与 Ayu BreezeBlue TTS 桥（8765）。项目名 `bridage` 沿用仓库拼写。
 
@@ -14,7 +14,7 @@ Windows 统一启动包，整合 DSH fish-soul 客户网关（56781）、SnowLum
 
 ```text
 Start.cmd                       唯一启动文件
-VERSION                         1.0.1 机器可读版本
+VERSION                         1.0.2 机器可读版本
 scripts/Start-All.ps1           统一路径、进程和端口管理
 components/gateway/             V6.9.29 原功能重构，客户操作、56781、VMO 上报
 components/ayu/                 v1.4 Ayu TTS 桥；不保存 API 密钥
@@ -61,3 +61,7 @@ node scripts/Patch-SnowLuma-VMO.mjs "C:\dsh\SnowLuma"
 ```
 
 **发布说明：** 本仓库和 GitHub Release 只提供整合项目源码与可复现补丁器；SnowLuma v2.4.2 第三方运行文件不在公开仓库中。Windows/VMO 实机反向代理仍需单独验证。
+
+## v1.0.2 — 已验证启动脚本
+
+重新构建统一启动器，修正 v1.0.1 首次发布时的 PowerShell 文本替换错误。GitHub Actions Windows CI（Node 测试、补丁器语法、PowerShell 语法）通过后发布。SnowLuma 资源补丁仍保持 1.0.1 的 SHA-256 校验与备份路径。
