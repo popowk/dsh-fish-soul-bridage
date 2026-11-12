@@ -1,0 +1,26 @@
+name: Inspect complete SnowLuma remote ZIP
+on:
+  push:
+    paths: ['.github/workflows/inspect-snowluma.yml']
+  workflow_dispatch:
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download and inspect user-provided ZIPs
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --retry 2 -L --max-time 150 -o /tmp/snow1.zip 'https://haha.tmd.pet/SnowLuma-v2.4.2-win-x64-BasePath-Overlay.zip'
+          curl --fail --retry 2 -L --max-time 150 -o /tmp/snow2.zip 'https://pan.tmd.pet/down.php?hash=7fddc8958202eecea079bcb2ed8152a7'
+          python3 - <<'PY'
+          import zipfile,hashlib,os
+          for i in (1,2):
+            p=f'/tmp/snow{i}.zip';z=zipfile.ZipFile(p)
+            names=z.namelist()
+            print('SOURCE',i,'ZIP_BYTES',os.path.getsize(p),'FILES',len(names),'VALID',z.testzip() is None,flush=True)
+            for key in ('node.exe','release.json','client/assets/overview-page-Bm3ks5zC.css','client/logo.png','client/assets/index-DolPqBYW.vmo.js'):
+              match=[n for n in names if n.endswith(key)]
+              print(key,match[:2],flush=True)
+            print('PREFIX',names[:8],flush=True)
+          PY
