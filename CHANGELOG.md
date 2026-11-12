@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.2
+
+- Preserve bundled SnowLuma runtime files byte-for-byte on Windows checkout via `.gitattributes`.
+- Add Windows runner verification for SHA-256-pinned VMO frontend assets before release.
+- Package complete SnowLuma directly from GitHub repository without DSH Desktop or fish-soul plugin installers.
+
+
 ## 1.1.1
 
 - Track the **complete patched SnowLuma 2.4.2 runtime** directly under `components/snowluma/`, including Node, backend, native dependencies and WebUI resources.
