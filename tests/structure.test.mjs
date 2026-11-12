@@ -15,3 +15,18 @@ test('no old component startup scripts',async()=>{
  const paths=[join(root,'components','ayu'),join(root,'components','snowluma'),join(root,'components','gateway')];
  for(const p of paths){const files=await readdir(p);assert.equal(files.some(f=>/^Start\.(bat|cmd)$/i.test(f)||/^launcher\.bat$/i.test(f)),false);}
 });
+
+test('full SnowLuma runtime is tracked; excluded installers are absent',async()=>{
+ for(const path of [
+   'components/snowluma/node.exe',
+   'components/snowluma/index.mjs',
+   'components/snowluma/release.json',
+   'components/snowluma/client/logo.png',
+   'components/snowluma/client/assets/overview-page-Bm3ks5zC.css',
+   'components/snowluma/client/assets/router-_TYMdJui.vmo.js',
+   'components/snowluma/native/snowluma-win32-x64.node'
+ ]) await access(join(root,path));
+ for(const path of ['components/dsh-desktop','components/dsh-plugin']){
+   await assert.rejects(access(join(root,path)));
+ }
+});
