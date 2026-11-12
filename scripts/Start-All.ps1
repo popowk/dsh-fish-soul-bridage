@@ -121,18 +121,7 @@ if (-not $env:SNOWLUMA_DIR) {
   $sources += 'C:\dsh\SnowLuma'
   if (Test-Path -LiteralPath 'C:\dsh' -PathType Container) {
     $sources += @(Get-ChildItem -LiteralPath 'C:\dsh' -Directory -ErrorAction SilentlyContinue |
-      Where-Object { $_.Name -match '^SnowLuma(?:[-_].*)?
-if (-not $env:FS_CUSTOMER_MODELS_CONFIG) { $env:FS_CUSTOMER_MODELS_CONFIG = '1' }
-if (-not $env:FS_CUSTOMER_DOUYIN_CONFIG) { $env:FS_CUSTOMER_DOUYIN_CONFIG = '1' }
-if (-not $env:FS_CUSTOMER_SOCIAL_CONFIG) { $env:FS_CUSTOMER_SOCIAL_CONFIG = '1' }
-if (-not $env:FS_CUSTOMER_BILI_AUTH) { $env:FS_CUSTOMER_BILI_AUTH = '1' }
-if (-not $env:FS_CUSTOMER_DOUYIN_BROWSER) { $env:FS_CUSTOMER_DOUYIN_BROWSER = '1' }
-$env:FS_CUSTOMER_DOUYIN_CUSTOM_BROWSER = '0'
-Start-Ayu $node
-Write-Host '[Start] Starting DSH plugin installer, SnowLuma supervisor, and 56781 gateway.'
-& (Join-Path $gateway 'deploy.ps1')
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
- } | ForEach-Object { $_.FullName })
+      Where-Object { $_.Name -match '^SnowLuma(?:[-_].*)?$' } | ForEach-Object { $_.FullName })
   }
   foreach ($candidate in @($sources | Select-Object -Unique)) {
     if (!(Test-Path -LiteralPath (Join-Path $candidate 'index.mjs') -PathType Leaf) -or
@@ -148,9 +137,7 @@ if (-not $env:SNOWLUMA_DIR) { $env:SNOWLUMA_DIR = $snow }
 $patchEntry = Join-Path $env:SNOWLUMA_DIR 'client\assets\index-DolPqBYW.vmo.js'
 if (Test-Path -LiteralPath $patchEntry -PathType Leaf) {
   & $node (Join-Path $project 'scripts\Patch-SnowLuma-VMO.mjs') $env:SNOWLUMA_DIR
-  if ($LASTEXITCODE -ne 0) {
-    throw 'SnowLuma VMO patch preflight failed. Inspect the installed version before starting.'
-  }
+  if ($LASTEXITCODE -ne 0) { throw 'SnowLuma VMO patch preflight failed. Inspect the installed version before starting.' }
 } else {
   Write-Warning 'Recognized SnowLuma VMO BasePath overlay not found; reverse proxy compatibility is unverified.'
 }
