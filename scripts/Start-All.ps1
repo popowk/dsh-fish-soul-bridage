@@ -147,6 +147,51 @@ if (-not $env:FS_CUSTOMER_SOCIAL_CONFIG) { $env:FS_CUSTOMER_SOCIAL_CONFIG = '1' 
 if (-not $env:FS_CUSTOMER_BILI_AUTH) { $env:FS_CUSTOMER_BILI_AUTH = '1' }
 if (-not $env:FS_CUSTOMER_DOUYIN_BROWSER) { $env:FS_CUSTOMER_DOUYIN_BROWSER = '1' }
 $env:FS_CUSTOMER_DOUYIN_CUSTOM_BROWSER = '0'
+# DSH Desktop is included in the full Windows distribution. Install only
+# when no existing Desktop CLI is found. Preserve existing DSH settings.
+function Find-DSH-DesktopCli {
+  $bases = @(
+    'C:\dsh\DeepSeek Harness',
+    (Join-Path $env:LOCALAPPDATA 'Programs\DeepSeek Harness'),
+    (Join-Path $env:LOCALAPPDATA 'DeepSeek Harness'),
+    'C:\Program Files\DeepSeek Harness'
+  )
+  foreach ($base in $bases) {
+    $cli = Join-Path $base 'resources\runtime\cli\bin\dsh.cmd'
+    if (Test-Path -LiteralPath $cli -PathType Leaf) { return $cli }
+  }
+  $command = Get-Command 'dsh.cmd' -ErrorAction SilentlyContinue
+  if ($command) { return $command.Source }
+  return $null
+}
+function Ensure-DSH-Desktop {
+  if (Find-DSH-DesktopCli) {
+    Write-Host '[OK] Existing DSH Desktop is available; no installation needed.'
+    return
+  }
+  $installer = Join-Path $project 'components\dsh-desktop\deepseek-harness-0.2.2-rc.1-win-x64.exe'
+  if (!(Test-Path -LiteralPath $installer -PathType Leaf)) {
+    throw 'Bundled DSH Desktop installer missing. Use the Windows-Full GitHub release, not the source ZIP.'
+  }
+  Write-Host '[Setup] Installing bundled DSH Desktop 0.2.2-rc.1 for the current Windows user.'
+  $expected = '830947f8996dc05d991ca9133fff4d3400073e47b9cfa6507754867e79482b23'
+  $actual = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+  if ($actual -ne $expected) { throw 'Bundled DSH Desktop installer checksum mismatch.' }
+  $installerProcess = Start-Process -FilePath $installer -ArgumentList '/S' -Wait -PassThru
+  if ($installerProcess.ExitCode -ne 0) {
+    throw ('DSH Desktop offline installer failed, exit='+$installerProcess.ExitCode)
+  }
+  # The Desktop runtime may finish unpacking on its first interactive start.
+  for ($n=0; $n -lt 12; $n++) {
+    if (Find-DSH-DesktopCli) {
+      Write-Host '[OK] Bundled DSH Desktop CLI is now available.'
+      return
+    }
+    Start-Sleep -Seconds 2
+  }
+  throw 'DSH Desktop installer finished but the CLI is not ready. Open Desktop once in the interactive Windows session.'
+}
+Ensure-DSH-Desktop
 Start-Ayu $node
 Write-Host '[Start] Starting DSH plugin installer, SnowLuma supervisor, and 56781 gateway.'
 & (Join-Path $gateway 'deploy.ps1')
