@@ -10,8 +10,18 @@
 host-auth.json
 node_modules/
 components/gateway/vendor/
-components/snowluma/
 **/*.bak
 **/*.backup
 *.zip
 *.7z
+
+# SnowLuma binaries and public client assets are intentionally tracked.
+# Private runtime state, browser sessions and credentials are not.
+components/snowluma/config/
+components/snowluma/logs/
+components/snowluma/state/
+components/snowluma/sessions/
+components/snowluma/.vmo-backups/
+components/snowluma/client/.vmo-backups/
+components/snowluma/**/.credentials.yaml
+components/snowluma/**/fish-soul-config.json
