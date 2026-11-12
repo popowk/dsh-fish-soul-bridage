@@ -1,4 +1,4 @@
-# dsh-fish-soul-bridage v1.1.1
+# dsh-fish-soul-bridage v1.1.2
 
 Windows x64 整合项目：**DSH fish-soul 客户网关 + SnowLuma 2.4.2 + Ayu BreezeBlue TTS**。项目名 `bridage` 保留现有 GitHub 仓库拼写。
 
