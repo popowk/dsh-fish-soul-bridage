@@ -35,7 +35,7 @@ jobs:
           curl --fail --location --retry 8 --retry-all-errors --retry-delay 4 --max-time 220 \
             --output /tmp/snow-overlay.zip 'https://haha.tmd.pet/SnowLuma-v2.4.2-win-x64-BasePath-Overlay.zip'
           echo '6e330436feb7c976dc9fc6d7af057ae5230294da8ec77a19c3991b6c32b41434  /tmp/snow-overlay.zip' | sha256sum -c -
-          sha256sum /tmp/snow-complete.zip
+          echo '0912926c5e73260f35b000278a8658493fc9452f36782c32fa86f0e825bad81a  /tmp/snow-complete.zip' | sha256sum -c -
           python3 - <<'PY'
           import zipfile
           for p in ['/tmp/snow-complete.zip','/tmp/snow-overlay.zip']:
