@@ -19,6 +19,7 @@ jobs:
             p=f'/tmp/snow{i}.zip';z=zipfile.ZipFile(p)
             names=z.namelist()
             print('SOURCE',i,'ZIP_BYTES',os.path.getsize(p),'FILES',len(names),'VALID',z.testzip() is None,flush=True)
+            print('ZIP_SHA256',hashlib.sha256(open(p,'rb').read()).hexdigest(),flush=True)
             for key in ('node.exe','release.json','client/assets/overview-page-Bm3ks5zC.css','client/logo.png','client/assets/index-DolPqBYW.vmo.js'):
               match=[n for n in names if n.endswith(key)]
               print(key,match[:2],flush=True)
