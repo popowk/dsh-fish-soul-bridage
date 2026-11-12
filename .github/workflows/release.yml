@@ -14,6 +14,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: release/v1.0.0
+          fetch-depth: 0
       - name: Package source (without third-party SnowLuma binaries)
         shell: bash
         run: |
@@ -26,13 +27,17 @@ jobs:
                       continue
                   out.write(p,p.as_posix())
           PY
-      - name: Publish immutable source release
+      - name: Publish verified v1.0.0 source release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
+          TARGET="$(git rev-parse HEAD)"
+          git tag -f v1.0.0 "$TARGET"
+          git push origin +refs/tags/v1.0.0
           if gh release view v1.0.0 >/dev/null 2>&1; then
-            echo 'v1.0.0 already exists; no overwrite'
-            exit 0
+            gh release upload v1.0.0 dsh-fish-soul-bridage-v1.0.0-source.zip --clobber
+            gh release edit v1.0.0 --target "$TARGET" --notes 'Unified Gateway + Ayu TTS + SnowLuma launch integration. Source release only: SnowLuma binaries are not redistributed. For the full Windows bundle use the separately provided package. JavaScript and Windows PowerShell syntax CI passed; live Windows integration still requires validation.'
+          else
+            gh release create v1.0.0 dsh-fish-soul-bridage-v1.0.0-source.zip --target "$TARGET" --title 'dsh-fish-soul-bridage v1.0.0' --notes 'Unified Gateway + Ayu TTS + SnowLuma integration. Source only; licensed SnowLuma installation required.'
           fi
-          gh release create v1.0.0 dsh-fish-soul-bridage-v1.0.0-source.zip --target 84e979b174ef97bf867c247a1f0af65b21ee4b3e --title 'dsh-fish-soul-bridage v1.0.0' --notes 'Unified Gateway + Ayu TTS + SnowLuma launch integration. Source release only. SnowLuma third-party binary overlay is intentionally excluded; use a separately authorized complete SnowLuma installation. Windows integration testing is still required.'
