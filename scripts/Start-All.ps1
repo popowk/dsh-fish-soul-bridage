@@ -10,15 +10,11 @@ $logs = Join-Path $env:LOCALAPPDATA 'dsh-fish-soul-bridage\logs'
 New-Item -ItemType Directory -Force -Path $logs | Out-Null
 $version = (Get-Content -LiteralPath (Join-Path $project 'VERSION') -Raw -Encoding UTF8).Trim()
 function Node-Location {
-  $choices = @(
-    (Join-Path $snow 'node.exe'),
-    (Join-Path $env:USERPROFILE '.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\node\bin\node.exe'),
-    'C:\Users\Administrator\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\node\bin\node.exe'
-  )
-  foreach ($choice in $choices) { if (Test-Path -LiteralPath $choice -PathType Leaf) { return $choice } }
-  $cmd = Get-Command node.exe -ErrorAction SilentlyContinue
-  if ($cmd) { return $cmd.Source }
-  throw 'No Node.js executable found. Bundle SnowLuma/node.exe or install Node.js 22.5+.'
+  $bundled = Join-Path $snow 'node.exe'
+  if (!(Test-Path -LiteralPath $bundled -PathType Leaf)) {
+    throw 'Bundled SnowLuma/node.exe is missing. Download the Windows-Full ZIP, not a source archive.'
+  }
+  return $bundled
 }
 function Service-Ready([int]$port) {
   try {
@@ -53,54 +49,15 @@ function Start-Ayu([string]$node) {
   }
   throw ('Ayu did not become healthy. Check ' + $stderr)
 }
-# Complete the bundled PATCHED SnowLuma overlay from an existing same-version,
-# licensed local installation. Copy ONLY missing public client files, never
-# configuration, credentials, private runtime state, or external files.
-function Complete-SnowLuma-Assets {
-  if ($env:SNOWLUMA_DIR) { return }  # explicit override wins
-  $assetDir = Join-Path $snow 'client\assets'
-  if (@(Get-ChildItem -LiteralPath $assetDir -Filter '*.css' -File -ErrorAction SilentlyContinue).Count -gt 0) { return }
-  $candidates = @()
-  if ($env:SNOWLUMA_COMPLETE_SOURCE) { $candidates += $env:SNOWLUMA_COMPLETE_SOURCE }
-  $candidates += @('C:\dsh\SnowLuma')
-  if (Test-Path -LiteralPath 'C:\dsh') {
-    $candidates += @(Get-ChildItem -LiteralPath 'C:\dsh' -Directory -ErrorAction SilentlyContinue |
-      Where-Object { $_.Name -match '^SnowLuma(?:[-_].*)?$' } |
-      ForEach-Object { $_.FullName })
+# All SnowLuma runtime files are tracked in components/snowluma.
+# No previous installations, local CSS copying, downloads or external Node fallback.
+foreach ($item in @('release.json','index.mjs','node.exe','client\logo.png',
+                   'client\assets\overview-page-Bm3ks5zC.css',
+                   'client\assets\index-DolPqBYW.vmo.js')) {
+  if (!(Test-Path -LiteralPath (Join-Path $snow $item) -PathType Leaf)) {
+    throw ('Incomplete bundled SnowLuma 2.4.2: missing ' + $item)
   }
-  foreach ($candidate in @($candidates | Select-Object -Unique)) {
-    if (!(Test-Path -LiteralPath (Join-Path $candidate 'client\assets') -PathType Container)) { continue }
-    if ($candidate.TrimEnd('\') -eq $snow.TrimEnd('\')) { continue }
-    $existing = @(Get-ChildItem -LiteralPath (Join-Path $candidate 'client\assets') -Filter '*.css' -File -ErrorAction SilentlyContinue)
-    if ($existing.Count -eq 0) { continue }
-    try {
-      $release = Get-Content -LiteralPath (Join-Path $candidate 'release.json') -Raw -Encoding UTF8 | ConvertFrom-Json
-      if ([string]$release.version -ne '2.4.2') { continue }
-      $sourceClient = Join-Path $candidate 'client'
-      $targetClient = Join-Path $snow 'client'
-      $prefix = $sourceClient.TrimEnd('\') + '\'
-      $count = 0
-      foreach ($file in @(Get-ChildItem -LiteralPath $sourceClient -File -Recurse -ErrorAction Stop)) {
-        if (($file.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { continue }
-        $relative = $file.FullName.Substring($prefix.Length)
-        $target = Join-Path $targetClient $relative
-        if (Test-Path -LiteralPath $target) { continue } # preserve patched JS and HTML
-        $parent = Split-Path -Parent $target
-        if (!(Test-Path -LiteralPath $parent)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
-        Copy-Item -LiteralPath $file.FullName -Destination $target -ErrorAction Stop
-        $count++
-      }
-      if (@(Get-ChildItem -LiteralPath $assetDir -Filter '*.css' -File -ErrorAction SilentlyContinue).Count -gt 0) {
-        Write-Host ('[OK] SnowLuma 2.4.2 overlay completed with '+$count+' missing client files from '+$candidate)
-        return
-      }
-    } catch {
-      Write-Warning ('Could not complete bundled SnowLuma assets: '+$_.Exception.GetType().Name)
-    }
-  }
-  Write-Warning 'Bundled SnowLuma overlay still incomplete; an installed full SnowLuma version will be used if found.'
 }
-Complete-SnowLuma-Assets
 $node = Node-Location
 Write-Host ('[Start] dsh-fish-soul-bridage ' + $version)
 Write-Host ('[Path]  ' + $project)
@@ -112,34 +69,11 @@ if ($CheckOnly) {
   exit 0
 }
 $env:FS_BUNDLE_NODE = $node
-# Caller overrides SNOWLUMA_DIR when an existing FULL installation is used.
-# Bundled fix overlay may lack full CSS assets; deploy.ps1 will not start a partial WebUI.
-# Prefer complete SnowLuma v2.4.2, including external installations.
-if (-not $env:SNOWLUMA_DIR) {
-  $sources = @($snow)
-  if ($env:SNOWLUMA_COMPLETE_SOURCE) { $sources += $env:SNOWLUMA_COMPLETE_SOURCE }
-  $sources += 'C:\dsh\SnowLuma'
-  if (Test-Path -LiteralPath 'C:\dsh' -PathType Container) {
-    $sources += @(Get-ChildItem -LiteralPath 'C:\dsh' -Directory -ErrorAction SilentlyContinue |
-      Where-Object { $_.Name -match '^SnowLuma(?:[-_].*)?$' } | ForEach-Object { $_.FullName })
-  }
-  foreach ($candidate in @($sources | Select-Object -Unique)) {
-    if (!(Test-Path -LiteralPath (Join-Path $candidate 'index.mjs') -PathType Leaf) -or
-        !(Test-Path -LiteralPath (Join-Path $candidate 'client\assets\overview-page-Bm3ks5zC.css') -PathType Leaf)) { continue }
-    try {
-      $rel = Get-Content -LiteralPath (Join-Path $candidate 'release.json') -Raw -Encoding UTF8 | ConvertFrom-Json
-      if ([string]$rel.version -eq '2.4.2') { $env:SNOWLUMA_DIR = $candidate; break }
-    } catch {}
-  }
-}
-if (-not $env:SNOWLUMA_DIR) { $env:SNOWLUMA_DIR = $snow }
-# Never rewrite an unknown build. All three assets must match known SHA-256.
-$patchEntry = Join-Path $env:SNOWLUMA_DIR 'client\assets\index-DolPqBYW.vmo.js'
-if (Test-Path -LiteralPath $patchEntry -PathType Leaf) {
-  & $node (Join-Path $project 'scripts\Patch-SnowLuma-VMO.mjs') $env:SNOWLUMA_DIR
-  if ($LASTEXITCODE -ne 0) { throw 'SnowLuma VMO patch preflight failed. Inspect the installed version before starting.' }
-} else {
-  Write-Warning 'Recognized SnowLuma VMO BasePath overlay not found; reverse proxy compatibility is unverified.'
+$env:SNOWLUMA_DIR = $snow
+# Safe to repeat: known SHA-256 builds only; unknown files never overwritten.
+& $node (Join-Path $project 'scripts\Patch-SnowLuma-VMO.mjs') $snow
+if ($LASTEXITCODE -ne 0) {
+  throw 'Bundled SnowLuma v2.4.2 asset verification failed.'
 }
 if (-not $env:FS_CUSTOMER_MODELS_CONFIG) { $env:FS_CUSTOMER_MODELS_CONFIG = '1' }
 if (-not $env:FS_CUSTOMER_DOUYIN_CONFIG) { $env:FS_CUSTOMER_DOUYIN_CONFIG = '1' }
@@ -147,51 +81,9 @@ if (-not $env:FS_CUSTOMER_SOCIAL_CONFIG) { $env:FS_CUSTOMER_SOCIAL_CONFIG = '1' 
 if (-not $env:FS_CUSTOMER_BILI_AUTH) { $env:FS_CUSTOMER_BILI_AUTH = '1' }
 if (-not $env:FS_CUSTOMER_DOUYIN_BROWSER) { $env:FS_CUSTOMER_DOUYIN_BROWSER = '1' }
 $env:FS_CUSTOMER_DOUYIN_CUSTOM_BROWSER = '0'
-# DSH Desktop is included in the full Windows distribution. Install only
-# when no existing Desktop CLI is found. Preserve existing DSH settings.
-function Find-DSH-DesktopCli {
-  $bases = @(
-    'C:\dsh\DeepSeek Harness',
-    (Join-Path $env:LOCALAPPDATA 'Programs\DeepSeek Harness'),
-    (Join-Path $env:LOCALAPPDATA 'DeepSeek Harness'),
-    'C:\Program Files\DeepSeek Harness'
-  )
-  foreach ($base in $bases) {
-    $cli = Join-Path $base 'resources\runtime\cli\bin\dsh.cmd'
-    if (Test-Path -LiteralPath $cli -PathType Leaf) { return $cli }
-  }
-  $command = Get-Command 'dsh.cmd' -ErrorAction SilentlyContinue
-  if ($command) { return $command.Source }
-  return $null
-}
-function Ensure-DSH-Desktop {
-  if (Find-DSH-DesktopCli) {
-    Write-Host '[OK] Existing DSH Desktop is available; no installation needed.'
-    return
-  }
-  $installer = Join-Path $project 'components\dsh-desktop\deepseek-harness-0.2.2-rc.1-win-x64.exe'
-  if (!(Test-Path -LiteralPath $installer -PathType Leaf)) {
-    throw 'Bundled DSH Desktop installer missing. Use the Windows-Full GitHub release, not the source ZIP.'
-  }
-  Write-Host '[Setup] Installing bundled DSH Desktop 0.2.2-rc.1 for the current Windows user.'
-  $expected = '830947f8996dc05d991ca9133fff4d3400073e47b9cfa6507754867e79482b23'
-  $actual = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
-  if ($actual -ne $expected) { throw 'Bundled DSH Desktop installer checksum mismatch.' }
-  $installerProcess = Start-Process -FilePath $installer -ArgumentList '/S' -Wait -PassThru
-  if ($installerProcess.ExitCode -ne 0) {
-    throw ('DSH Desktop offline installer failed, exit='+$installerProcess.ExitCode)
-  }
-  # The Desktop runtime may finish unpacking on its first interactive start.
-  for ($n=0; $n -lt 12; $n++) {
-    if (Find-DSH-DesktopCli) {
-      Write-Host '[OK] Bundled DSH Desktop CLI is now available.'
-      return
-    }
-    Start-Sleep -Seconds 2
-  }
-  throw 'DSH Desktop installer finished but the CLI is not ready. Open Desktop once in the interactive Windows session.'
-}
-Ensure-DSH-Desktop
+# DSH Desktop and its fish-soul plugin are external prerequisites.
+# The package contains neither DSH Desktop installer nor fish-soul .tgz.
+# Gateway deploy.ps1 resolves the existing Desktop and manages the plugin if needed.
 Start-Ayu $node
 Write-Host '[Start] Starting DSH plugin installer, SnowLuma supervisor, and 56781 gateway.'
 & (Join-Path $gateway 'deploy.ps1')
