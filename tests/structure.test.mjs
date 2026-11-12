@@ -5,10 +5,10 @@ import {join,dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 const root=join(dirname(fileURLToPath(import.meta.url)),'..');
 test('single launcher and VERSION',async()=>{
- assert.equal((await readFile(join(root,'VERSION'),'utf8')).trim(),'1.0.0');
+ assert.equal((await readFile(join(root,'VERSION'),'utf8')).trim(),JSON.parse(await readFile(join(root,'package.json'),'utf8')).version);
  assert.match(await readFile(join(root,'Start.cmd'),'utf8'),/scripts\\Start-All.ps1/);
  const p=await readFile(join(root,'scripts','Start-All.ps1'),'utf8');
- assert.match(p,/Start-Ayu/);assert.match(p,/components\\gateway/);assert.match(p,/SNOWLUMA_DIR/);
+ assert.match(p,/Patch-SnowLuma-VMO.mjs/);assert.match(p,/Start-Ayu/);assert.match(p,/components\\gateway/);assert.match(p,/SNOWLUMA_DIR/);
  for(const dir of ['gateway','ayu','snowluma'])await access(join(root,'components',dir));
 });
 test('no old component startup scripts',async()=>{
