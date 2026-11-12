@@ -1,0 +1,3 @@
+# Keep bundled SnowLuma runtime byte-for-byte identical across Windows/Linux checkout.
+# Minified VMO JS is SHA-256 verified; CRLF conversion breaks trusted asset checks.
+components/snowluma/** -text
