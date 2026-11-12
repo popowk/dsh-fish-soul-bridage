@@ -9,3 +9,4 @@
 - Preserve gateway CODE/VMO reporting and SnowLuma secure bootstrap-password capture.
 - Prevent use of the supplied incomplete SnowLuma overlay as a complete runtime; require CSS assets before startup.
 - Add version identity through root `VERSION`, package.json, gateway health endpoint.
+- Rehydrate missing static WebUI files from a local, complete, matching SnowLuma 2.4.2 installation without replacing patched JS or touching credential data.

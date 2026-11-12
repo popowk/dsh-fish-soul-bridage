@@ -53,6 +53,54 @@ function Start-Ayu([string]$node) {
   }
   throw ('Ayu did not become healthy. Check ' + $stderr)
 }
+# Complete the bundled PATCHED SnowLuma overlay from an existing same-version,
+# licensed local installation. Copy ONLY missing public client files, never
+# configuration, credentials, private runtime state, or external files.
+function Complete-SnowLuma-Assets {
+  if ($env:SNOWLUMA_DIR) { return }  # explicit override wins
+  $assetDir = Join-Path $snow 'client\assets'
+  if (@(Get-ChildItem -LiteralPath $assetDir -Filter '*.css' -File -ErrorAction SilentlyContinue).Count -gt 0) { return }
+  $candidates = @()
+  if ($env:SNOWLUMA_COMPLETE_SOURCE) { $candidates += $env:SNOWLUMA_COMPLETE_SOURCE }
+  $candidates += @('C:\dsh\SnowLuma')
+  if (Test-Path -LiteralPath 'C:\dsh') {
+    $candidates += @(Get-ChildItem -LiteralPath 'C:\dsh' -Directory -ErrorAction SilentlyContinue |
+      Where-Object { $_.Name -match '^SnowLuma(?:[-_].*)?$' } |
+      ForEach-Object { $_.FullName })
+  }
+  foreach ($candidate in @($candidates | Select-Object -Unique)) {
+    if (!(Test-Path -LiteralPath (Join-Path $candidate 'client\assets') -PathType Container)) { continue }
+    if ($candidate.TrimEnd('\') -eq $snow.TrimEnd('\')) { continue }
+    $existing = @(Get-ChildItem -LiteralPath (Join-Path $candidate 'client\assets') -Filter '*.css' -File -ErrorAction SilentlyContinue)
+    if ($existing.Count -eq 0) { continue }
+    try {
+      $release = Get-Content -LiteralPath (Join-Path $candidate 'release.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+      if ([string]$release.version -ne '2.4.2') { continue }
+      $sourceClient = Join-Path $candidate 'client'
+      $targetClient = Join-Path $snow 'client'
+      $prefix = $sourceClient.TrimEnd('\') + '\'
+      $count = 0
+      foreach ($file in @(Get-ChildItem -LiteralPath $sourceClient -File -Recurse -ErrorAction Stop)) {
+        if (($file.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { continue }
+        $relative = $file.FullName.Substring($prefix.Length)
+        $target = Join-Path $targetClient $relative
+        if (Test-Path -LiteralPath $target) { continue } # preserve patched JS and HTML
+        $parent = Split-Path -Parent $target
+        if (!(Test-Path -LiteralPath $parent)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
+        Copy-Item -LiteralPath $file.FullName -Destination $target -ErrorAction Stop
+        $count++
+      }
+      if (@(Get-ChildItem -LiteralPath $assetDir -Filter '*.css' -File -ErrorAction SilentlyContinue).Count -gt 0) {
+        Write-Host ('[OK] SnowLuma 2.4.2 overlay completed with '+$count+' missing client files from '+$candidate)
+        return
+      }
+    } catch {
+      Write-Warning ('Could not complete bundled SnowLuma assets: '+$_.Exception.GetType().Name)
+    }
+  }
+  Write-Warning 'Bundled SnowLuma overlay still incomplete; an installed full SnowLuma version will be used if found.'
+}
+Complete-SnowLuma-Assets
 $node = Node-Location
 Write-Host ('[Start] dsh-fish-soul-bridage ' + $version)
 Write-Host ('[Path]  ' + $project)
