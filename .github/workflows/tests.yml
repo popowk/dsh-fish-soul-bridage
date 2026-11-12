@@ -14,6 +14,11 @@ jobs:
         run: node --check scripts/Patch-SnowLuma-VMO.mjs
       - name: JavaScript tests
         run: npm test
+      - name: Verify bundled SnowLuma byte-for-byte on Windows
+        shell: pwsh
+        run: |
+          & ./components/snowluma/node.exe scripts/Patch-SnowLuma-VMO.mjs components/snowluma --check
+          if ($LASTEXITCODE -ne 0) { throw 'SnowLuma Git checkout altered VMO assets' }
       - name: Validate PowerShell syntax
         shell: pwsh
         run: |
