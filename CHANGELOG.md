@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.1.1
+
+- Track the **complete patched SnowLuma 2.4.2 runtime** directly under `components/snowluma/`, including Node, backend, native dependencies and WebUI resources.
+- Remove DSH Desktop offline installer and fish-soul .tgz plugin package from GitHub Windows release.
+- Stop downloading SnowLuma during release builds: package exactly the files committed to the repository.
+- Remove runtime scanning/copying of older SnowLuma installations and enforce a single bundled startup path.
+- Preserve DSH Desktop as a preinstalled prerequisite, use the installed DSH CLI to find/install fish-soul when missing.
+
+
 ## 1.1.0
 
 - Publish Windows-Full ZIP with SnowLuma v2.4.2 full runtime, Node, native modules and VMO BasePath/CSS/Logo fixes.
