@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.0
+
+- Publish Windows-Full ZIP with SnowLuma v2.4.2 full runtime, Node, native modules and VMO BasePath/CSS/Logo fixes.
+- Bundle Ayu bridge, fish-soul gateway, DSH Desktop 0.2.2-rc.1 offline installer and fish-soul plugin v0.15.33 tarball.
+- Use system Python only; add checksum verification and unified Start.cmd installation/start.
+- Keep source-only ZIP separate from deployable Windows-Full ZIP.
+
+
 ## 1.0.2
 
 - Reconstruct and validate the unified Start-All.ps1 launcher after fixing a text substitution corruption in the initial v1.0.1 release.
