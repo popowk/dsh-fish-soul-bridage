@@ -1,4 +1,4 @@
-# dsh-fish-soul-bridage v1.0.0
+# dsh-fish-soul-bridage v1.0.1
 
 Windows 统一启动包，整合 DSH fish-soul 客户网关（56781）、SnowLuma WebUI/VMO 上报与 Ayu BreezeBlue TTS 桥（8765）。项目名 `bridage` 沿用仓库拼写。
 
@@ -14,7 +14,7 @@ Windows 统一启动包，整合 DSH fish-soul 客户网关（56781）、SnowLum
 
 ```text
 Start.cmd                       唯一启动文件
-VERSION                         1.0.0 机器可读版本
+VERSION                         1.0.1 机器可读版本
 scripts/Start-All.ps1           统一路径、进程和端口管理
 components/gateway/             V6.9.29 原功能重构，客户操作、56781、VMO 上报
 components/ayu/                 v1.4 Ayu TTS 桥；不保存 API 密钥
@@ -42,3 +42,22 @@ tests/                          集成结构和配置回归测试
 - 8765 端口冲突：退出旧版单独 Ayu 实例或设置 `BRIDGE_PORT`（并同步 TTS BaseURL），统一入口不会强杀不相关进程。
 - SnowLuma 网页缺 CSS：检查 `SNOWLUMA_DIR\client\assets\*.css`，不可只复制补丁并假装完整安装。
 - VMO 502/404：分别检查本机服务健康、18767 注册与 8766 WSS 代理，单独验证上游。
+## v1.0.1 — SnowLuma 2.4.2 反代修复
+
+使用完整的 SnowLuma 2.4.2 安装目录，且其前端已经包含 VMO BasePath Overlay (`client/assets/*.vmo.js`)。
+统一 `Start.cmd` 会先校验三个前端文件的 SHA-256，再修复 Logo、背景预览和调试文件上传的根路径问题。已修复文件会直接跳过；不认识的文件不会被强行覆盖。
+原文件会备份到 `client/.vmo-backups/v1.0.1/`。如已经有完整 SnowLuma，可通过 `SNOWLUMA_DIR` 指向该目录，无需把第三方二进制提交到 GitHub。
+
+手动只读预检：
+
+```powershell
+node scripts/Patch-SnowLuma-VMO.mjs "C:\dsh\SnowLuma" --check
+```
+
+停止 SnowLuma 后手动修复：
+
+```powershell
+node scripts/Patch-SnowLuma-VMO.mjs "C:\dsh\SnowLuma"
+```
+
+**发布说明：** 本仓库和 GitHub Release 只提供整合项目源码与可复现补丁器；SnowLuma v2.4.2 第三方运行文件不在公开仓库中。Windows/VMO 实机反向代理仍需单独验证。
