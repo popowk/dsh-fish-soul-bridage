@@ -60,7 +60,7 @@ test('0.15.55 exact routes preserve file boundaries and diagnostics protections'
  assert.equal(validateBody('/stickers/delete',{file:'猫.png',workspacePath:ws},true).ok,true);
  assert.equal(validateBody('/stickers/tags',{file:'..\\secret.png',workspacePath:ws,tags:'a'},true).ok,false);
  assert.equal(validateBody('/stickers/tags',{file:'猫.png',workspacePath:'\\\\attacker\\share',tags:'a'},true).ok,false);
- assert.equal(validateQuery('/stickers/import','?name='+encodeURIComponent('小猫')), {ok:true});
+ assert.deepEqual(validateQuery('/stickers/import','?name='+encodeURIComponent('小猫')),{ok:true});
  assert.deepEqual(validateQuery('/stickers/import',''),{ok:true}); // legacy JSON client
  assert.equal(validateQuery('/stickers/import','?name=..%5Csystem').ok,false);
  assert.equal(validateQuery('/stickers/import','?name=http%3A%2F%2Fevil').ok,false);
