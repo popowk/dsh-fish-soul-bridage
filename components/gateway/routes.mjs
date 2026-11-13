@@ -1,9 +1,9 @@
-// Path and method inventory extended against dsh-fish-soul v0.15.32 upstream source (2026-11-10).
+// Path and method inventory extended against dsh-fish-soul v0.15.55 upstream source (2026-11-13).
 // No broad /api, prefix, glob, path traversal, or arbitrary DSH RPC forwarding.
 export const ROUTES = Object.freeze({
  'GET': [
   '/ui/panel.css', '/diagnose', '/retrieval/state', '/life/state', '/inspector/overview',
-  '/channels/state', '/memory/state', '/inspector/person', '/activity',
+  '/channels/state', '/memory/state', '/inspector/person', '/activity', '/diag-log',
   '/backup/state', '/export/memories', '/import/history/state',
   '/models/state', '/voice/state', '/stickers/state', '/stickers/file', '/slang/state',
   '/onboarding/state', '/behavior/state', '/memory/weekly/state', '/memory/weekly/sources', '/storage/state', '/storage/search', '/chat-archive/state', '/chat-archive/list', '/persona/state', '/worldinfo/state', '/update/state'
@@ -18,14 +18,14 @@ export const ROUTES = Object.freeze({
   '/channels/douyin-config','/douyin/browser/start','/douyin/browser/close',
   '/douyin/window','/douyin/browser/rescan','/douyin/screenshot','/douyin/click',
   '/douyin/self-check','/douyin/browse-now','/douyin/post-now','/douyin/comments-now',
-  '/douyin/inbox-gap-ack','/douyin/inbox-resolve','/douyin/post-resolve',
+  '/douyin/inbox-gap-ack','/douyin/inbox-resolve','/douyin/inbox-dismiss-all','/douyin/post-resolve',
   '/memory/config','/memory/digest-now','/memory/weekly/config','/memory/weekly/run',
   '/storage/config','/storage/snapshot','/storage/restore','/storage/delete','/chat-archive/config','/chat-archive/delete',
   '/backup/now','/backup/restore','/backup/restore-cancel','/backup/config',
   '/import/history/preview','/import/history/start','/import/history/resume',
   '/import/history/discard','/import/history/cancel',
   '/models/config','/web/test','/voice/config','/voice/test',
-  '/stickers/config','/stickers/rename','/stickers/delete','/stickers/import',
+  '/stickers/config','/stickers/rename','/stickers/delete','/stickers/tags','/stickers/import', '/diag-log/clear',
   '/import/maibot-extras/preview','/import/maibot-extras/apply',
   '/slang/learn','/slang/edit','/slang/config','/onboarding/dismiss',
   '/behavior/config','/groups/note','/chat-models/config','/memory/debug',
