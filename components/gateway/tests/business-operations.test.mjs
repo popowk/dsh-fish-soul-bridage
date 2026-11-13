@@ -24,5 +24,8 @@ test('unlisted paths, privileged RPC and arbitrary file downloads are always den
   assert.equal(allowedEndpoint('POST',path,opts),false,path);
   assert.equal(allowedEndpoint('GET',path,opts),false,path);
  }
- for(const e of ['/diagnose','/stickers/file'])assert.equal(allowedEndpoint('GET',e,opts),false,e);
+ assert.equal(allowedEndpoint('GET','/diagnose',opts),false);
+ // 0.15.55 sticker images are allowed only after authenticated gateway access
+ // and strict filename/workspace query validation (plus native list membership).
+ assert.equal(allowedEndpoint('GET','/stickers/file',opts),true);
 });
