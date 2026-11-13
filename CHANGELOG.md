@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.3
+
+- Adapt customer gateway for dsh-fish-soul v0.15.55: MiniMax TTS, MiniMax/DashScope STT; strict Douyin masterUid/shareCard/replyWindowMinutes schemas.
+- Restore authenticated sticker viewing and native binary image imports (20 MiB max, verified image signatures, workspace/filename query checks), manual tag edits, and diagnostic logs.
+- Add native endpoint inventory and regression coverage for Douyin inbox actions, tags, binary uploads, blocked unsafe file/command requests.
+- Keep SnowLuma 2.4.2, Ayu, single Start.cmd and the release package unchanged except the gateway source; DSH Desktop and fish-soul installers remain excluded.
+
+
 ## 1.1.2
 
 - Preserve bundled SnowLuma runtime files byte-for-byte on Windows checkout via `.gitattributes`.
