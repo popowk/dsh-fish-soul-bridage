@@ -35,6 +35,14 @@ const CSP="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inlin
 const HEADERS={'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','X-Frame-Options':'DENY','Content-Security-Policy':CSP};
 const MIME={'.js':'application/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.html':'text/html; charset=utf-8'};
 const MAX_JSON=256*1024;
+const MAX_STICKER_UPLOAD=20*1024*1024; // fish-soul >=0.15.46 native binary image limit
+function stickerMagic(buf){
+ if(buf.length>=8&&buf.subarray(0,8).equals(Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a])))return 'image/png';
+ if(buf.length>=3&&buf[0]===0xff&&buf[1]===0xd8&&buf[2]===0xff)return 'image/jpeg';
+ if(buf.length>=6&&['GIF87a','GIF89a'].includes(buf.toString('ascii',0,6)))return 'image/gif';
+ if(buf.length>=12&&buf.toString('ascii',0,4)==='RIFF'&&buf.toString('ascii',8,12)==='WEBP')return 'image/webp';
+ return '';
+}
 // Mutating business operations (including imports, deletion, restore, and
 // publishing) are permitted on this authenticated per-VM gateway. The
 // strict exclusions live in customer-policy.mjs. Host RPC / raw WS / arbitrary
@@ -143,9 +151,9 @@ function upstreamTimeout(endpoint){
  return 30000;
 }
 
-async function fetchPlugin(req,endpoint,search='',body){
+async function fetchPlugin(req,endpoint,search='',body,contentType='application/json'){
  const target=new URL(PREFIX+endpoint+search,upstream);
- return fetch(target,{method:req.method,headers:{cookie:ownerCookie,origin:upstream.origin,referer:upstream.origin+'/',accept:req.headers.accept||'*/*',...(body?{'content-type':'application/json'}:{})},body,redirect:'manual',signal:AbortSignal.timeout(upstreamTimeout(endpoint))});
+ return fetch(target,{method:req.method,headers:{cookie:ownerCookie,origin:upstream.origin,referer:upstream.origin+'/',accept:req.headers.accept||'*/*',...(body?{'content-type':contentType}:{})},body,redirect:'manual',signal:AbortSignal.timeout(upstreamTimeout(endpoint))});
 }
 function safeDetail(v){
  const str=String(v||'').slice(0,300);
@@ -171,22 +179,37 @@ async function bridgePlugin(req,res,path,u){
  if(!query.ok)return reject(req,res,'policy-'+query.reason,400);
  const quota=consumeQuota(req.method,endpoint);
  if(!quota.ok)return reject(req,res,'rate-limit',429);
- let body;
+ let body,contentType='application/json';
  if(req.method==='POST'){
-  if(!validOrigin(req)||req.headers['sec-fetch-site']==='cross-site'||!/^application\/json(?:\s*;|$)/i.test(req.headers['content-type']||''))return reject(req,res,'policy-origin',403);
-  const raw=await readBody(req);
-  let parsed;
-  try{parsed=raw.length?JSON.parse(raw.toString('utf8')):{};}
-  catch{return send(res,400,{ok:false,error:'Invalid JSON body'});}
-  const checked=validateBody(endpoint,parsed,raw.length>0,{allowCustomBrowser:CUSTOMER_DOUYIN_CUSTOM_BROWSER});
-  if(!checked.ok)return reject(req,res,'policy-'+checked.reason,400);
-  // Canonical JSON removes ambiguous whitespace and duplicate property syntax.
-  // Empty native POSTs (update/check and several browser controls) stay empty.
-  body=raw.length?Buffer.from(JSON.stringify(checked.value)):undefined;
-  if(endpoint==='/voice/test')lastTtsRequest=summarizeVoiceTestBody(checked.value);
+  if(!validOrigin(req)||req.headers['sec-fetch-site']==='cross-site')return reject(req,res,'policy-origin',403);
+  const incomingType=String(req.headers['content-type']||'').split(';')[0].trim().toLowerCase();
+  const rawSticker=endpoint==='/stickers/import'&&
+    ['image/png','image/jpeg','image/gif','image/webp','application/octet-stream'].includes(incomingType);
+  if(rawSticker){
+   // The only binary POST tunnel is the authenticated sticker importer; never
+   // widen body/MIME limits for the remaining plugin or DSH endpoints.
+   const raw=await readBody(req,MAX_STICKER_UPLOAD);
+   const magic=stickerMagic(raw);
+   if(!magic||(incomingType!=='application/octet-stream'&&incomingType!==magic))
+    return reject(req,res,'policy-sticker-binary-type',415);
+   body=raw;contentType=incomingType;
+  }else{
+   if(!/^application\/json(?:\s*;|$)/i.test(req.headers['content-type']||''))
+    return reject(req,res,'policy-json-content-type',415);
+   const raw=await readBody(req);
+   let parsed;
+   try{parsed=raw.length?JSON.parse(raw.toString('utf8')):{};}
+   catch{return send(res,400,{ok:false,error:'Invalid JSON body'});}
+   const checked=validateBody(endpoint,parsed,raw.length>0,{allowCustomBrowser:CUSTOMER_DOUYIN_CUSTOM_BROWSER});
+   if(!checked.ok)return reject(req,res,'policy-'+checked.reason,400);
+   // Canonical JSON removes ambiguous whitespace and duplicate property syntax.
+   // Empty native POSTs (update/check and several browser controls) stay empty.
+   body=raw.length?Buffer.from(JSON.stringify(checked.value)):undefined;
+   if(endpoint==='/voice/test')lastTtsRequest=summarizeVoiceTestBody(checked.value);
+  }
  }
  let up;
- try{up=await fetchPlugin(req,endpoint,u.search,body);}
+ try{up=await fetchPlugin(req,endpoint,u.search,body,contentType);}
  catch(e){
   const kind=e?.name==='TimeoutError'||e?.name==='AbortError'?'gateway-timeout':'upstream-connection';
   const status=kind==='gateway-timeout'?504:502;
