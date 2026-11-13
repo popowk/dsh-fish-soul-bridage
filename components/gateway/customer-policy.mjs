@@ -57,6 +57,8 @@ function safeWorkspace(value){
   !/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(value);
 }
 function safeStickerQuery(endpoint,raw){
+ // Older clients send JSON sticker imports without a filename query.
+ if(endpoint==='/stickers/import'&&!raw)return {ok:true};
  if(raw.length>1400)return {ok:false,reason:'sticker-query-length'};
  const params=new URLSearchParams(raw.startsWith('?')?raw.slice(1):raw);
  const entries=[...params];
