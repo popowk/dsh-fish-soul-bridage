@@ -1,5 +1,5 @@
 /**
- * V6.9.29 per-VM customer policy (fish-soul 0.15.32).
+ * V6.9.29 per-VM customer policy (fish-soul 0.15.55).
  * Enable the upstream fish-soul business workflows, including destructive
  * actions. Explicitly prevent operations that can execute system commands,
  * select arbitrary local workspaces, fetch arbitrary network targets, or
@@ -9,7 +9,7 @@ import {ALLOW} from './routes.mjs';
 
 // Private debug and raw-file downloads are not safe behind an owner-cookie
 // adapter even if later releases accidentally include them in the inventory.
-const blockedGet = new Set(['/diagnose','/stickers/file']);
+const blockedGet = new Set(['/diagnose']);
 export const CUSTOMER_GET = new Set([...ALLOW.GET].filter(x=>!blockedGet.has(x)));
 
 // Only verified exact endpoints in routes.mjs can pass. There is never a
@@ -45,7 +45,33 @@ const QMAP = Object.freeze({
  '/inspector/overview':new Set(['limit','offset','page','personId','query','q','status','source','type']),
  '/inspector/importance-lock':new Set(['id'])
 });
+// Only named sticker assets from an existing plugin-reported workspace may
+// be read. Native fish-soul still checks knownWorkspace() and list membership.
+function safeStickerFile(value){
+ return typeof value==='string'&&value.length>=5&&value.length<=160&&
+  !value.includes('..')&&/^[^\x00-\x1f\\/:*?"<>|]+\.(?:png|jpe?g|gif|webp)$/i.test(value);
+}
+function safeWorkspace(value){
+ return typeof value==='string'&&value.length>3&&value.length<=500&&
+  /^[A-Za-z]:[\\/]/.test(value)&&!/[\x00-\x1f]/.test(value)&&
+  !/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(value);
+}
+function safeStickerQuery(endpoint,raw){
+ if(raw.length>1400)return {ok:false,reason:'sticker-query-length'};
+ const params=new URLSearchParams(raw.startsWith('?')?raw.slice(1):raw);
+ const entries=[...params];
+ if(endpoint==='/stickers/file'){
+  if(entries.length!==2||!params.has('file')||!params.has('ws')||
+    !safeStickerFile(params.get('file'))||!safeWorkspace(params.get('ws')))return {ok:false,reason:'sticker-file-query'};
+  return {ok:true};
+ }
+ if(entries.length!==1||!params.has('name'))return {ok:false,reason:'sticker-import-query'};
+ const name=params.get('name');
+ return name&&name.length<=140&&!name.includes('..')&&!/[\\/:*?"<>|\x00-\x1f]/.test(name)
+  ?{ok:true}:{ok:false,reason:'sticker-import-name'};
+}
 export function validateQuery(endpoint,raw){
+ if(endpoint==='/stickers/file'||endpoint==='/stickers/import')return safeStickerQuery(endpoint,raw);
  if(!raw)return {ok:true};
  if(raw.length>1024)return {ok:false,reason:'query-length'};
  const allowed=QMAP[endpoint];if(!allowed)return {ok:false,reason:'query-not-approved'};
@@ -125,7 +151,7 @@ function validateModelSettings(value){
 // The generic JSON scanner intentionally rejects URLs and API keys; voice
 // configuration needs a dedicated, exact schema instead of broad permission.
 const VOICE_CONFIG_FIELDS = new Set([
- 'enabled','baseURL','sttBaseURL','ttsBaseURL','sttModel','ttsModel',
+ 'enabled','sttProvider','baseURL','sttBaseURL','ttsBaseURL','sttModel','ttsModel',
  'ttsVoice','volcAppId','volcCluster','volcResourceId','volcEndpoint',
  'ttsProvider','apiKey','sttApiKey','ttsApiKey','speak','maxChars',
  'ttsPerDay','sttPerDay','timeoutSec'
@@ -153,7 +179,8 @@ export function validateVoiceConfig(value) {
    if(!['https:','http:'].includes(u.protocol)||u.username||u.password||u.hash||u.search)return 'voice-url';
    // HTTP only to local TTS servers; remote API keys must use TLS.
    if(u.protocol==='http:'&&!['localhost','127.0.0.1','[::1]'].includes(u.hostname))return 'voice-url-insecure';
-  }else if(key==='ttsProvider'&&!['','openai','mimo','volcengine'].includes(v))return 'voice-provider';
+  }else if(key==='ttsProvider'&&!['','openai','mimo','volcengine','minimax'].includes(v))return 'voice-provider';
+  else if(key==='sttProvider'&&!['','openai','minimax','dashscope'].includes(v))return 'voice-stt-provider';
   else if(key==='speak'&&!['never','mirror','sometimes'].includes(v))return 'voice-speak';
  }
  return null;
@@ -162,7 +189,7 @@ export function validateVoiceConfig(value) {
 // Explicit schema mirrored from upstream lib/routes-douyin.js (the config
 // handler, not the active posting endpoints). A constrained allow-list is used
 // because the regular generic write scanner is deliberately too broad.
-const DOUYIN_TOP=new Set(['enabled','autoReply','masterName','allowList','replyAll','links','groups','groupReply','callNames','browser','window','browse','post','comments']);
+const DOUYIN_TOP=new Set(['enabled','autoReply','masterName','masterUid','shareCard','replyWindowMinutes','allowList','replyAll','links','groups','groupReply','callNames','browser','window','browse','post','comments']);
 const DOUYIN_BROWSER_KEYS=new Set(['kind','customPath']);
 const DOUYIN_BROWSE_KEYS=new Set(['enabled','perDay','videosPerSession','like','likeApi','collect','frames','framesPerDay','share','shareInDm','mode']);
 const DOUYIN_POST_KEYS=new Set(['enabled','perDay']);
@@ -170,10 +197,15 @@ const DOUYIN_COMMENT_KEYS=new Set(['enabled','perHour','emoji']);
 function validateDouyinConfig(value,{allowCustomBrowser=false}={}){
  const nested=(v,allow)=>v!==null&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).every(k=>allow.has(k));
  if(!nested(value,DOUYIN_TOP)||Object.keys(value).length===0)return 'douyin-fields';
- for(const key of ['enabled','autoReply','replyAll','groupReply']){
+ for(const key of ['enabled','autoReply','replyAll','groupReply','shareCard']){
   if(Object.hasOwn(value,key)&&typeof value[key]!=='boolean')return 'douyin-boolean';
  }
  if(Object.hasOwn(value,'masterName')&&(typeof value.masterName!=='string'||value.masterName.trim().length>40))return 'douyin-master-name';
+ // Keep 19-digit Douyin UIDs as strings: Number() silently corrupts them.
+ if(Object.hasOwn(value,'masterUid')&&(typeof value.masterUid!=='string'||
+   value.masterUid.length>40||!/^(?:(?:douyin:)?\d{1,22})?$/.test(value.masterUid.trim())))return 'douyin-master-uid';
+ if(Object.hasOwn(value,'replyWindowMinutes')&&(!Number.isSafeInteger(value.replyWindowMinutes)||
+   value.replyWindowMinutes<1||value.replyWindowMinutes>1440))return 'douyin-reply-window';
  for(const key of ['allowList','groups','callNames','links']){
   if(!Object.hasOwn(value,key))continue;
   const list=value[key];
@@ -255,6 +287,22 @@ function validateChannelConfig(value){
  if(value===null||typeof value!=='object'||Array.isArray(value)||Object.keys(value).length===0)return 'channel-empty';
  return visit(value);
 }
+// Sticker writes are restricted to a filename already present in a known
+// native workspace (verified upstream). Never allow arbitrary file operation
+// paths, traversal, URI or command fields through the owner-cookie adapter.
+function validateStickerAction(endpoint,value){
+ const allowed=endpoint==='/stickers/tags'?['file','workspacePath','tags','hash']:
+   endpoint==='/stickers/rename'?['file','workspacePath','name']:['file','workspacePath'];
+ if(!Object.keys(value).every(k=>allowed.includes(k)))return 'sticker-action-fields';
+ if(!safeWorkspace(value.workspacePath)||!safeStickerFile(value.file))return 'sticker-action-target';
+ if(endpoint==='/stickers/tags'){
+  if(typeof value.tags!=='string'||value.tags.length>500||/[\x00-\x1f]/.test(value.tags))return 'sticker-tags';
+  if(Object.hasOwn(value,'hash')&&(!/^[a-f0-9]{40}$/i.test(value.hash)))return 'sticker-hash';
+ }
+ if(endpoint==='/stickers/rename'&&(typeof value.name!=='string'||!value.name.trim()||
+   value.name.length>100||/[\\/:*?"<>|\x00-\x1f]/.test(value.name)||value.name.includes('..')))return 'sticker-name';
+ return null;
+}
 function validateBiliLogin(endpoint,value){
  if(value===null||typeof value!=='object'||Array.isArray(value))return 'bili-login-object';
  const serialized=JSON.stringify(value);
@@ -302,6 +350,12 @@ export function validateBody(endpoint,value,hasBody,options={}){
    const error=validateBiliLogin(endpoint,value);
    return error?{ok:false,reason:error}:{ok:true,value};
   }
+  case '/stickers/tags':
+  case '/stickers/rename':
+  case '/stickers/delete': {
+   const error=validateStickerAction(endpoint,value);
+   return error?{ok:false,reason:error}:{ok:true,value};
+  }
   case '/voice/config': {
    if(!hasBody)return {ok:false,reason:'voice-empty'};
    const error=validateVoiceConfig(value);
@@ -316,6 +370,8 @@ export function validateBody(endpoint,value,hasBody,options={}){
   case '/douyin/browser/start':
   case '/douyin/browser/close':
   case '/douyin/self-check':
+  case '/douyin/inbox-dismiss-all':
+  case '/diag-log/clear':
   case '/persona/undo':
    return empty?{ok:true,value:{}}:{ok:false,reason:'extra-fields'};
   case '/update/config':
@@ -326,7 +382,7 @@ export function validateBody(endpoint,value,hasBody,options={}){
    return (empty||(exactKeys(value,['checkLogin'])&&typeof value.checkLogin==='boolean'))
      ?{ok:true,value}:{ok:false,reason:'screenshot-check-login'};
   case '/douyin/inbox-gap-ack':
-   return exactKeys(value,['id'])&&Number.isSafeInteger(value.id)&&value.id>0
+   return (empty||(exactKeys(value,['id'])&&Number.isSafeInteger(value.id)&&value.id>0))
      ?{ok:true,value}:{ok:false,reason:'douyin-inbox-id'};
   case '/douyin/inbox-resolve':
    return exactKeys(value,['id','action'])&&Number.isSafeInteger(value.id)&&value.id>0&&['retry','dismiss'].includes(value.action)
