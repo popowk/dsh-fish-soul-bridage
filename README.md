@@ -1,4 +1,4 @@
-# dsh-fish-soul-bridage v1.1.2
+# dsh-fish-soul-bridage v1.1.3
 
 Windows x64 整合项目：**DSH fish-soul 客户网关 + SnowLuma 2.4.2 + Ayu BreezeBlue TTS**。项目名 `bridage` 保留现有 GitHub 仓库拼写。
 
@@ -40,3 +40,13 @@ SnowLuma 的 VMO 反代版包括动态 CSS、Logo、背景预览及调试上传�
 修改代码后，Windows CI 检查 JavaScript 和 PowerShell 语法；更新 `VERSION` 和 `package.json` 后，GitHub Actions 从**仓库中已提交的 SnowLuma 文件**构建完整 ZIP，并验证启动入口、Node、CSS、Logo、网关、Ayu 都存在。Release 不包含 DSH Desktop 的安装程序，也不包含 fish-soul 插件安装包。
 
 不收集或提交本机 DSH Token、SnowLuma 随机密码、fish-soul 独立登录码或浏览器登录数据。更新时不要覆盖用户配置目录。Windows 实机启动及 VMO 端到端反代仍需另行验证。
+
+## v1.1.3 — 兼容 dsh-fish-soul 0.15.55
+
+- 新版抖音配置：支持 `masterUid`（19 位及以上 UID 保留字符串）、`shareCard` 和 `replyWindowMinutes`，继续拒绝未知命令字段和危险浏览器路径。
+- 语音设置：支持 TTS MiniMax、STT MiniMax/DashScope，TTS 试听调用与超时策略保持原样。
+- 表情包：兼容 `POST /stickers/import?name=...` 原始 PNG/JPEG/GIF/WebP（单张 20 MiB 上限）、旧版 JSON 请求、标签编辑；只在认证后读取已列入 native 工作区清单的图片。
+- 运行日志：允许 `/diag-log` 查看和 `/diag-log/clear` 清空；抖音消息批量忽略入口已纳入明确白名单。
+- **安全边界不变**：不提供任意命令执行、DSH Host RPC、任意网址读取或任意文件访问，所有 POST 要求已授权会话和同源校验。
+- **不会自动升级 fish-soul 插件**：此版本调整的是网关兼容性；如要使用上游修复，请在 DSH Desktop 中安装或升级 `dsh-fish-soul@0.15.55`。已经工作的旧插件不会被安装器擅自替换。
+- SnowLuma 2.4.2、Ayu、内置 Node 与 `Start.cmd` 保持不变；发布包仍不含 DSH Desktop 安装程序及 fish-soul 插件离线安装包。Windows 端到端运行需要使用真实 DSH 和 VMO 做最后验证。
