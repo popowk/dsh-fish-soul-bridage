@@ -25,9 +25,10 @@ export const CUSTOMER_POST = new Set([...ALLOW.POST].filter(x=>!BLOCKED_CUSTOMER
 const SOCIAL_CONFIG=new Set(['/channels/qq-config','/channels/bili-config']);
 const BILI_AUTH=new Set(['/bili/qr/start','/bili/qr/poll','/bili/cookie','/bili/logout']);
 const DOUYIN_BROWSER = new Set(['/douyin/browser/start','/douyin/browser/close','/douyin/screenshot','/douyin/click','/douyin/self-check']);
+const DOUYIN_IDENTITY = new Set(['/douyin/uin-candidates','/douyin/uin-confirm','/douyin/uin-dismiss']);
 export function allowedEndpoint(method,endpoint,options={}){
  if(endpoint==='/models/config'&&options.modelConfig===false)return false;
- if(endpoint==='/channels/douyin-config'&&options.douyinConfig===false)return false;
+ if((endpoint==='/channels/douyin-config'||DOUYIN_IDENTITY.has(endpoint))&&options.douyinConfig===false)return false;
  if(SOCIAL_CONFIG.has(endpoint)&&options.socialConfig===false)return false;
  if(BILI_AUTH.has(endpoint)&&options.biliAuth===false)return false;
  if(DOUYIN_BROWSER.has(endpoint)&&options.douyinBrowser===false)return false;
