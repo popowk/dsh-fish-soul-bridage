@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.1.4
+
+- Adapt exact customer routes for dsh-fish-soul v0.16.4: Douyin candidate identity list/confirm/dismiss, archived self-memory pagination, sticker tagging/embedding backfill, and per-person memory consolidation.
+- Strict schemas for Douyin candidate identity, bounded backfill workspaces/limits and self-memory offset; reuse the existing Douyin configuration permission and per-VM login controls.
+- Bound model-heavy backfill/dream operations to three combined requests per hour and 240-second default upstream timeout (configurable up to 300 seconds).
+- Add 0.16.4 gateway regression tests for authentication, query rejection, blocked privileged routes and simulated DSH forwarding; Windows tests and SnowLuma checks passed.
+- Preserve the single Start.cmd, the complete SnowLuma v2.4.2 runtime, Node and Ayu. Do not bundle DSH Desktop or fish-soul plugin installers.
+- Note: v0.16.4 fixes a cross-account conversation-context leak inside the upstream plugin itself. Existing DSH installations must update dsh-fish-soul to v0.16.4 separately.
+
+
 ## 1.1.3
 
 - Adapt customer gateway for dsh-fish-soul v0.15.55: MiniMax TTS, MiniMax/DashScope STT; strict Douyin masterUid/shareCard/replyWindowMinutes schemas.
