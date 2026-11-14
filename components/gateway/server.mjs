@@ -143,6 +143,7 @@ function boundedTimeout(name,defaultMs,minMs,maxMs){
  return Number.isFinite(n)&&n>=minMs&&n<=maxMs?Math.trunc(n):defaultMs;
 }
 function upstreamTimeout(endpoint){
+ if(endpoint==='/stickers/backfill'||endpoint==='/inspector/dream')return boundedTimeout('FS_AI_MAINTENANCE_TIMEOUT_MS',240000,30000,300000);
  if(endpoint==='/voice/test')return boundedTimeout('FS_TTS_TEST_TIMEOUT_MS',320000,65000,320000);
  if(endpoint==='/douyin/browser/start')return boundedTimeout('FS_DOUYIN_START_TIMEOUT_MS',120000,30000,180000);
  if(['/douyin/post-now','/douyin/comments-now'].includes(endpoint))return 180000;
