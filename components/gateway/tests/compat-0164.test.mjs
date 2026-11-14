@@ -48,6 +48,7 @@ test('0.16.4 self archive pagination rejects arbitrary query injection and out-o
 });
 
 test('0.16.4 native contract: candidate confirmation, tag backfill, dream',()=>{
+ assert.equal(validateBody('/channels/qq-config',{enabled:true,mentionOnly:true},true).ok,true);
  assert.deepEqual(validateBody('/douyin/uin-candidates',{},true),{ok:true,value:{}});
  assert.equal(validateBody('/douyin/uin-candidates',{cmd:'powershell'},true).ok,false);
  for(const p of ['/douyin/uin-confirm','/douyin/uin-dismiss']){
