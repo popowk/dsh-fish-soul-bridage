@@ -43,7 +43,8 @@ const QMAP = Object.freeze({
  '/export/memories':new Set(['format','personId','type']),
  '/activity':new Set(['limit','offset','page']),
  '/inspector/overview':new Set(['limit','offset','page','personId','query','q','status','source','type']),
- '/inspector/importance-lock':new Set(['id'])
+ '/inspector/importance-lock':new Set(['id']),
+ '/inspector/self-outdated':new Set(['offset'])
 });
 // Only named sticker assets from an existing plugin-reported workspace may
 // be read. Native fish-soul still checks knownWorkspace() and list membership.
@@ -74,6 +75,15 @@ function safeStickerQuery(endpoint,raw){
 }
 export function validateQuery(endpoint,raw){
  if(endpoint==='/stickers/file'||endpoint==='/stickers/import')return safeStickerQuery(endpoint,raw);
+ if(endpoint==='/inspector/self-outdated'){
+  if(!raw)return {ok:true};
+  if(raw.length>30)return {ok:false,reason:'self-outdated-query-length'};
+  const params=new URLSearchParams(raw.startsWith('?')?raw.slice(1):raw);
+  const values=[...params];
+  const offset=values.length===1&&values[0][0]==='offset'?values[0][1]:null;
+  return offset!==null&&/^\d{1,7}$/.test(offset)&&Number(offset)<=1000000
+   ?{ok:true}:{ok:false,reason:'self-outdated-offset'};
+ }
  if(!raw)return {ok:true};
  if(raw.length>1024)return {ok:false,reason:'query-length'};
  const allowed=QMAP[endpoint];if(!allowed)return {ok:false,reason:'query-not-approved'};
@@ -305,6 +315,21 @@ function validateStickerAction(endpoint,value){
    value.name.length>100||/[\\/:*?"<>|\x00-\x1f]/.test(value.name)||value.name.includes('..')))return 'sticker-name';
  return null;
 }
+// Identity changes are resolved against native pending candidate registry.
+function validDouyinCandidateName(name){
+ return typeof name==='string'&&name.trim()===name&&name.length>=1&&
+   name.length<=80&&!/[\x00-\x1f\x7f\\\/]/.test(name)&&
+   !/^(?:file|https?|javascript|data):/i.test(name);
+}
+function validateStickerBackfill(value){
+ const allowed=['workspacePath','limit'];
+ if(Object.keys(value).some(key=>!allowed.includes(key)))return 'sticker-backfill-fields';
+ if(Object.hasOwn(value,'workspacePath')&&value.workspacePath!==''&&!safeWorkspace(value.workspacePath))
+  return 'sticker-backfill-workspace';
+ if(Object.hasOwn(value,'limit')&&(!Number.isSafeInteger(value.limit)||value.limit<1||value.limit>100))
+  return 'sticker-backfill-limit';
+ return null;
+}
 function validateBiliLogin(endpoint,value){
  if(value===null||typeof value!=='object'||Array.isArray(value))return 'bili-login-object';
  const serialized=JSON.stringify(value);
@@ -352,6 +377,20 @@ export function validateBody(endpoint,value,hasBody,options={}){
    const error=validateBiliLogin(endpoint,value);
    return error?{ok:false,reason:error}:{ok:true,value};
   }
+  case '/stickers/backfill': {
+   const error=validateStickerBackfill(value);
+   return error?{ok:false,reason:error}:{ok:true,value};
+  }
+  case '/douyin/uin-candidates':
+   return empty?{ok:true,value:{}}:{ok:false,reason:'douyin-uin-candidates-fields'};
+  case '/douyin/uin-confirm':
+  case '/douyin/uin-dismiss':
+   return exactKeys(value,['name'])&&validDouyinCandidateName(value.name)
+    ?{ok:true,value}:{ok:false,reason:'douyin-uin-candidate-name'};
+  case '/inspector/dream':
+   return exactKeys(value,['ownerId'])&&typeof value.ownerId==='string'&&
+     value.ownerId.length<=150&&/^(?:user:)?[\w:@.-]{1,145}$/.test(value.ownerId)
+    ?{ok:true,value}:{ok:false,reason:'inspector-dream-owner'};
   case '/stickers/tags':
   case '/stickers/rename':
   case '/stickers/delete': {
@@ -414,13 +453,14 @@ export function validateBody(endpoint,value,hasBody,options={}){
 const WINDOWS=new Map();
 export function consumeQuota(method,endpoint,now=Date.now()){
  const category=method==='GET'?'read':
+  ['/stickers/backfill','/inspector/dream'].includes(endpoint)?'expensive':
   endpoint==='/voice/test'?'tts':
   endpoint==='/update/check'?'update':
   endpoint==='/douyin/screenshot'?'screenshots':
   endpoint==='/douyin/browser/start'?'browser-start':
   endpoint==='/bili/qr/start'?'qr-start':
   endpoint==='/bili/qr/poll'?'qr-poll':'write';
- const limits={read:[300,60_000],tts:[8,60_000],update:[12,3600_000],screenshots:[90,60_000],'browser-start':[4,60_000],'qr-start':[8,60_000],'qr-poll':[120,60_000],write:[60,60_000]};
+ const limits={read:[300,60_000],expensive:[3,3600_000],tts:[8,60_000],update:[12,3600_000],screenshots:[90,60_000],'browser-start':[4,60_000],'qr-start':[8,60_000],'qr-poll':[120,60_000],write:[60,60_000]};
  const [max,span]=limits[category],rec=WINDOWS.get(category);
  if(!rec||now-rec.at>=span){WINDOWS.set(category,{at:now,count:1});return {ok:true};}
  if(rec.count>=max)return {ok:false,reason:'rate-limit',retrySeconds:Math.ceil((span-(now-rec.at))/1000)};
