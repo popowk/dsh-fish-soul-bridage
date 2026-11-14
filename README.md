@@ -1,4 +1,4 @@
-# dsh-fish-soul-bridage v1.1.3
+# dsh-fish-soul-bridage v1.1.4
 
 Windows x64 整合项目：**DSH fish-soul 客户网关 + SnowLuma 2.4.2 + Ayu BreezeBlue TTS**。项目名 `bridage` 保留现有 GitHub 仓库拼写。
 
@@ -50,3 +50,15 @@ SnowLuma 的 VMO 反代版包括动态 CSS、Logo、背景预览及调试上传�
 - **安全边界不变**：不提供任意命令执行、DSH Host RPC、任意网址读取或任意文件访问，所有 POST 要求已授权会话和同源校验。
 - **不会自动升级 fish-soul 插件**：此版本调整的是网关兼容性；如要使用上游修复，请在 DSH Desktop 中安装或升级 `dsh-fish-soul@0.15.55`。已经工作的旧插件不会被安装器擅自替换。
 - SnowLuma 2.4.2、Ayu、内置 Node 与 `Start.cmd` 保持不变；发布包仍不含 DSH Desktop 安装程序及 fish-soul 插件离线安装包。Windows 端到端运行需要使用真实 DSH 和 VMO 做最后验证。
+
+## v1.1.4 — 适配 dsh-fish-soul 0.16.4
+
+本次为网关兼容性更新，不会覆盖 SnowLuma、Ayu、DSH Desktop 及用户配置。GitHub Windows-Full ZIP 仍从仓库内完整的 `components/snowluma/` 生成，不含 DSH Desktop 安装程序或 fish-soul 插件安装包。
+
+- 抖音身份确认：新增 `/douyin/uin-candidates`、`/douyin/uin-confirm`、`/douyin/uin-dismiss`，只允许受限的候选昵称和既有的抖音配置权限。
+- 自身旧记忆：支持 `GET /inspector/self-outdated?offset=...`，仅允许 offset 0–1000000 的安全分页参数；补齐人物卡“立即整理” `POST /inspector/dream`。
+- 表情包：支持 `POST /stickers/backfill`（给旧表情补标签和向量），限制工作区必须是后端已识别的本机路径，并限制单次数量；AI 补标签、人物整理共用低频额度及独立超时（默认 240 秒）。
+- 保持 `/update/apply`、系统命令、任意文件访问、DSH 核心 RPC 等高权限接口关闭。跨账号会话上下文的修复由 **上游 fish-soul 0.16.4 插件自身**提供，不能仅靠网关升级实现。
+- 原生 `client.diag.js` 等新分块由现有清单发现器按校验通过的插件资源动态加载，SnowLuma 反代和 Ayu 语音端口不变。
+
+**升级要求：**请先确认 Windows 内的 DSH Desktop 已安装真实的 `dsh-fish-soul@0.16.4` 并重新启动该插件；本 ZIP 只升级整合网关，不会自动升级/附带 fish-soul 插件。涉及用户私聊、抖音身份或历史记忆操作之前，请备份 DSH 资料和数据库。GitHub Windows CI 已通过模拟接口与权限测试；未在真实 DSH + QQ + VMO 客户环境完成端到端验证。
