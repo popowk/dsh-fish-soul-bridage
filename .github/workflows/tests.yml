@@ -1,13 +1,20 @@
 name: CI
+# Avoid a test run (and failure email) for every intermediate commit on main.
+# Pull requests and manual runs remain supported; release.yml validates VERSION releases.
 on:
-  push:
   pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   test:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: '22'
       - name: Verify SnowLuma patch script syntax
